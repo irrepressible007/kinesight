@@ -4,6 +4,8 @@
 
 Built for the Meta Global AI Developer Hackathon (Push the Frontier: Manufacturing, Hardware Assembly & Physical Systems).
 
+**Live demo: [kinesight.onrender.com](https://kinesight.onrender.com/?preset=plate_4screw_defect&run=1)**. It replays the three recorded preset analyses on Render's free plan. The first visit can take about a minute while the server wakes up. To compile your own SOPs or analyze your own footage, run it locally with a Meta API key (see [Running it](#running-it)).
+
 ![Workbench](docs/workbench.png)
 
 ## The problem
