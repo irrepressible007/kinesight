@@ -1,6 +1,7 @@
 {
   "title": "Mounting plate: compliant cycle",
   "subtitle": "All four corner screws driven. Use it as the passing reference run.",
+  "reference": true,
   "sop_text_file": "../plate_4screw_sop.txt",
   "sop": {
     "sop_title": "Electronics Enclosure Mounting Plate Fastening",

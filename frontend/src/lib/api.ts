@@ -1,4 +1,4 @@
-import type { CompiledSop, JobStatus, Limits, Preset, Tracks } from "./types";
+import type { CompiledSop, JobResult, JobStatus, Limits, Preset, Tracks } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
@@ -50,5 +50,16 @@ export const startJob = (sop: CompiledSop, source: { presetId?: string; video?: 
 };
 
 export const getJob = (id: string) => fetch(`${API_BASE}/api/jobs/${id}`).then((r) => json<JobStatus>(r));
+
+/** Poll a job until it finishes, reporting each stage. */
+export async function waitForJob(id: string, onStage?: (stage: string | null) => void): Promise<JobResult> {
+  for (;;) {
+    const job = await getJob(id);
+    onStage?.(job.stage);
+    if (job.status === "done" && job.result) return job.result;
+    if (job.status === "failed") throw new Error(job.error ?? "analysis failed");
+    await new Promise((r) => setTimeout(r, 800));
+  }
+}
 
 export const getTracks = (url: string) => fetch(media(url)).then((r) => json<Tracks>(r));

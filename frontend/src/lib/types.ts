@@ -116,6 +116,8 @@ export interface Preset {
   sop: CompiledSop;
   video_url: string;
   source: { credit: string; url: string };
+  /** The compliant run other cycles of the same SOP are compared against. */
+  reference?: boolean;
 }
 
 export interface Limits {

@@ -92,8 +92,8 @@ export default function SopEditorPanel(p: Props) {
             {p.limits?.live && p.limits.video_left != null && (
               <div className="num px-0.5 text-[10.5px] leading-snug text-ink-3">
                 Public demo: clips up to {p.limits.max_video_sec ?? "∞"}s · {p.limits.video_left} live video
-                analyses and {p.limits.compile_left} new compiles left today. A new clip takes a few minutes on
-                this free server.
+                analyses and {p.limits.compile_left} new compiles left today. On this free server a new clip takes
+                about half its length in minutes (a 60s clip, about 30 min), so keep this tab open.
               </div>
             )}
           </div>

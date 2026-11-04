@@ -12,9 +12,11 @@ interface Props {
   onTime: (t: number) => void;
   hidden: Set<string>;
   onToggle: (label: string) => void;
+  /** Fill the parent's height on wide screens; off, the player keeps a 16:9 box everywhere. */
+  fill?: boolean;
 }
 
-export default function AnnotatedVideoCanvas({ videoUrl, tracks, videoRef, onTime, hidden, onToggle }: Props) {
+export default function AnnotatedVideoCanvas({ videoUrl, tracks, videoRef, onTime, hidden, onToggle, fill = true }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [playing, setPlaying] = useState(false);
   const [time, setTime] = useState(0);
@@ -103,8 +105,10 @@ export default function AnnotatedVideoCanvas({ videoUrl, tracks, videoRef, onTim
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black xl:aspect-auto xl:min-h-0 xl:flex-1">
+    <div className={`flex flex-col ${fill ? "h-full" : ""}`}>
+      <div
+        className={`relative aspect-video w-full overflow-hidden rounded-lg bg-black ${fill ? "xl:aspect-auto xl:min-h-0 xl:flex-1" : ""}`}
+      >
         {videoUrl ? (
           <>
             <video

@@ -4,9 +4,10 @@ import { Activity } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import AnnotatedVideoCanvas from "@/components/AnnotatedVideoCanvas";
 import AuditVerdictPanel from "@/components/AuditVerdictPanel";
+import CompareCycles, { type Cycle } from "@/components/CompareCycles";
 import SopEditorPanel from "@/components/SopEditorPanel";
 import TelemetryTimeline from "@/components/TelemetryTimeline";
-import { compileSop, compileSopFile, getJob, getLimits, getPresets, getTracks, startJob } from "@/lib/api";
+import { compileSop, compileSopFile, getLimits, getPresets, getTracks, startJob, waitForJob } from "@/lib/api";
 import type { CompiledSop, JobResult, Limits, Preset, Tracks } from "@/lib/types";
 
 export default function Workbench() {
@@ -28,6 +29,11 @@ export default function Workbench() {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [limits, setLimits] = useState<Limits | null>(null);
+  const [compareOpen, setCompareOpen] = useState(false);
+  const [reference, setReference] = useState<Cycle | null>(null);
+  const [referenceId, setReferenceId] = useState<string | null>(null);
+  const [referenceStage, setReferenceStage] = useState<string | null>(null);
+  const [referenceError, setReferenceError] = useState<string | null>(null);
   const refreshLimits = useCallback(() => {
     getLimits().then(setLimits).catch(() => {});
   }, []);
@@ -43,6 +49,8 @@ export default function Workbench() {
     setTracks(null);
     setStage(null);
     setError(null);
+    setCompareOpen(false);
+    setReference(null);
   }, []);
 
   const autoRun = useRef(false);
@@ -109,27 +117,20 @@ export default function Workbench() {
     setError(null);
     setResult(null);
     setTracks(null);
+    setCompareOpen(false);
+    setReference(null);
     setStage("Submitting job");
     try {
       const { job_id } = await startJob(sop, upload ? { video: upload } : { presetId: presetId! });
-      for (;;) {
-        const job = await getJob(job_id);
-        setStage(job.stage);
-        if (job.status === "done" && job.result) {
-          const tr = await getTracks(job.result.tracks_url);
-          setTracks(tr);
-          setResult(job.result);
-          setStage(job.result.cached ? "Served from cache" : "Analysis complete");
-          const startAt = Number(new URLSearchParams(window.location.search).get("t"));
-          if (startAt && videoRef.current) videoRef.current.currentTime = startAt;
-          // On phones the results sit below the rules, so bring them into view.
-          if (window.matchMedia("(max-width: 767px)").matches) {
-            resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-          }
-          break;
-        }
-        if (job.status === "failed") throw new Error(job.error ?? "analysis failed");
-        await new Promise((r) => setTimeout(r, 800));
+      const res = await waitForJob(job_id, setStage);
+      setTracks(await getTracks(res.tracks_url));
+      setResult(res);
+      setStage(res.cached ? "Served from cache" : "Analysis complete");
+      const startAt = Number(new URLSearchParams(window.location.search).get("t"));
+      if (startAt && videoRef.current) videoRef.current.currentTime = startAt;
+      // On phones the results sit below the rules, so bring them into view.
+      if (window.matchMedia("(max-width: 767px)").matches) {
+        resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     } catch (e) {
       setError((e as Error).message);
@@ -166,6 +167,36 @@ export default function Workbench() {
 
   const preset = presets.find((p) => p.id === presetId);
   const videoUrl = result?.video_url ?? uploadUrl ?? preset?.video_url ?? null;
+  const sourceLabel = upload?.name ?? preset?.title ?? "";
+
+  // Other presets whose rules check the same tool/part pairs can serve as a reference cycle.
+  const pairsOf = (s: CompiledSop) =>
+    [...new Set(s.steps.map((x) => `${x.actor_object}|${x.target_object}`))].sort().join(",");
+  const candidates = result ? presets.filter((p) => p.id !== presetId && pairsOf(p.sop) === pairsOf(result.sop)) : [];
+
+  // The reference runs under this cycle's rules, so both are judged the same way.
+  const loadReference = async (ref: Preset) => {
+    if (!result) return;
+    setReferenceId(ref.id);
+    setReference(null);
+    setReferenceError(null);
+    setReferenceStage("Running the reference cycle");
+    try {
+      const { job_id } = await startJob(result.sop, { presetId: ref.id });
+      const res = await waitForJob(job_id, setReferenceStage);
+      setReference({ label: ref.title, result: res, tracks: await getTracks(res.tracks_url) });
+    } catch (e) {
+      setReferenceError(`Couldn't load the reference: ${(e as Error).message}`);
+    } finally {
+      setReferenceStage(null);
+    }
+  };
+
+  const openCompare = () => {
+    setCompareOpen(true);
+    const current = candidates.find((c) => c.id === referenceId);
+    if (!reference || !current) void loadReference(candidates.find((c) => c.reference) ?? candidates[0]);
+  };
 
   // Layouts: one scrolling column on phones, a sticky rules column beside the results on
   // tablets and small laptops, and three fixed-height columns from 1280px up.
@@ -242,9 +273,26 @@ export default function Workbench() {
         </section>
 
         <section className="panel p-3 xl:min-h-0">
-          <AuditVerdictPanel result={result} onSeek={seek} />
+          <AuditVerdictPanel
+            result={result}
+            onSeek={seek}
+            sourceLabel={sourceLabel}
+            onCompare={candidates.length && tracks ? openCompare : undefined}
+          />
         </section>
       </main>
+      {compareOpen && result && tracks && (
+        <CompareCycles
+          current={{ label: sourceLabel, result, tracks }}
+          reference={reference}
+          candidates={candidates}
+          referenceId={referenceId}
+          onReference={loadReference}
+          loading={referenceStage}
+          error={referenceError}
+          onClose={() => setCompareOpen(false)}
+        />
+      )}
       {preset && (
         <footer className="num shrink-0 border-t border-line px-4 py-1 text-[10px] text-ink-3">
           Footage: <a className="underline" href={preset.source.url} target="_blank" rel="noreferrer">{preset.source.credit}</a>

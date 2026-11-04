@@ -1,25 +1,23 @@
 "use client";
 
-import { AlertTriangle, CheckCircle2, Clock, ShieldCheck, ShieldQuestion, X, Zap } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Clock, Columns2, Download, Loader2, ShieldCheck, ShieldQuestion, X, Zap } from "lucide-react";
 import { useState } from "react";
 import { media } from "@/lib/api";
-import type { JobResult, StepStatus } from "@/lib/types";
-
-const STATUS_TEXT: Record<StepStatus, string> = {
-  PASS: "Pass",
-  FAIL_MISSING: "Step skipped",
-  FAIL_COUNT_SHORTFALL: "Contact count short",
-  FAIL_SHORT_DURATION: "Contact too short",
-  FAIL_ORDER: "Out of order",
-};
+import { downloadReport } from "@/lib/report";
+import { STATUS_TEXT } from "@/lib/status";
+import type { JobResult } from "@/lib/types";
 
 interface Props {
   result: JobResult | null;
   onSeek: (t: number) => void;
+  sourceLabel: string;
+  /** Opens the side-by-side view; absent when no other cycle uses these rules. */
+  onCompare?: () => void;
 }
 
-export default function AuditVerdictPanel({ result, onSeek }: Props) {
+export default function AuditVerdictPanel({ result, onSeek, sourceLabel, onCompare }: Props) {
   const [zoom, setZoom] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   if (!result) {
     return (
@@ -59,6 +57,32 @@ export default function AuditVerdictPanel({ result, onSeek }: Props) {
           </span>
           <span>{telemetry.total_frames} frames @ {telemetry.fps_analyzed} fps</span>
         </div>
+      </div>
+
+      <div className={`grid shrink-0 gap-2 ${onCompare ? "grid-cols-2" : "grid-cols-1"}`}>
+        <button
+          onClick={async () => {
+            setExporting(true);
+            try {
+              await downloadReport(result, sourceLabel);
+            } finally {
+              setExporting(false);
+            }
+          }}
+          disabled={exporting}
+          className="flex items-center justify-center gap-1.5 rounded-md border border-line-2 bg-panel-2 px-2 py-1.5 text-[12px] font-medium text-ink hover:border-accent disabled:opacity-60"
+        >
+          {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} className="text-accent" />}
+          {exporting ? "Preparing…" : "Download QA report"}
+        </button>
+        {onCompare && (
+          <button
+            onClick={onCompare}
+            className="flex items-center justify-center gap-1.5 rounded-md border border-line-2 bg-panel-2 px-2 py-1.5 text-[12px] font-medium text-ink hover:border-accent"
+          >
+            <Columns2 size={13} className="text-accent" /> Compare cycles
+          </button>
+        )}
       </div>
 
       <div>

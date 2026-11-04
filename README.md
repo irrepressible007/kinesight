@@ -6,7 +6,7 @@ Built for the Meta Global AI Developer Hackathon (Push the Frontier: Manufacturi
 
 **Live demo: [kinesight.onrender.com](https://kinesight.onrender.com/?preset=plate_4screw_defect&run=1)**
 - It replays the three recorded preset analyses instantly.
-- It also accepts your own clips: up to 20 s each, within a small daily budget. A new clip takes a few minutes on the free server.
+- It also accepts your own clips: up to 60 s each, within a small daily budget. On the free server a new clip takes about half its length in minutes (about 30 minutes for a full minute), so keep the tab open while it runs.
 - The first visit after a quiet spell can take about a minute while the server wakes up.
 
 ![Workbench](docs/workbench.png)
@@ -170,7 +170,7 @@ All three SOPs were compiled live by Muse Spark 1.3. Their results ship pre-comp
 |---|---|
 | **Left: rules** | Footage picker (presets and upload), the SOP editor, **Compile rules with Muse Spark 1.3**, the compiled rule cards, and **Analyze video** |
 | **Center: evidence** | The video with live SAM 3.1 mask overlays, and the kinematic telemetry timeline below it |
-| **Right: verdict** | QA verdict, compliance score, per-step results, defect cards with root cause, keyframes, the Muse Image diagram, and pipeline latency |
+| **Right: verdict** | QA verdict, compliance score, **Download QA report** and **Compare cycles**, per-step results, defect cards with root cause, keyframes, the Muse Image diagram, and pipeline latency |
 
 The layout adapts to the screen:
 - **Wider than 1280 px:** three columns side by side.
@@ -183,7 +183,7 @@ The layout adapts to the screen:
 
 - **Presets.** Click one of the three cards. Its video, SOP and compiled rules load together.
 - **Your own clip.** Click **Analyze your own video** (highlighted, with a LIVE badge) and pick a file.
-  - On the hosted demo, clips are limited to 20 s and 50 MB. The note under the button shows how many live analyses are left today.
+  - On the hosted demo, clips are limited to 60 s and 100 MB. The note under the button shows how many live analyses are left today.
   - Running it yourself, the only limits are the ones you set (see [Configuration](#configuration)).
 
 ### Step 2: give it the SOP
@@ -205,7 +205,7 @@ The compiled rules are a proposal. Before analyzing you can:
 
 Edited rules reuse the cached SAM output. Only the kinematics, the rule check and, if something fails, the audit run again.
 
-On the hosted demo the presets' SAM output isn't stored, so re-running a preset with edited rules needs a fresh SAM pass. That is limited to clips up to 20 s, the same as uploads. The note under the compile button changes to "Rules edited by reviewer".
+On the hosted demo the presets' SAM output isn't stored, so re-running a preset with edited rules needs a fresh SAM pass and takes about as long as uploading the clip. The note under the compile button changes to "Rules edited by reviewer".
 
 ### Step 5: analyze
 
@@ -216,7 +216,7 @@ Click **Analyze video**. The line under the button shows progress:
 - Auditing flagged steps with Muse Spark
 - Done
 
-A combination of video and rules that was analyzed before is **Served from cache** instantly. On the hosted demo a new clip takes a few minutes, because the free server has a tenth of a CPU core.
+A combination of video and rules that was analyzed before is **Served from cache** instantly. On the hosted demo a new clip takes about half its length in minutes, because the free server has a tenth of a CPU core. Keep the tab open while it runs: the free server sleeps after 15 minutes without visitors.
 
 ### Step 6: read the results
 
@@ -248,6 +248,24 @@ A combination of video and rules that was analyzed before is **Served from cache
   - **Audited keyframes**: click to zoom.
   - **Muse Image corrective diagram**: click to zoom.
 - **Pipeline latency:** time spent in each stage of the original run, and whether this view was served from cache.
+
+### Step 7: share the report and compare cycles
+
+**Download QA report** saves one self-contained HTML file. It contains:
+- the verdict and compliance score;
+- a contact timeline for every step;
+- the steps table with every measured contact;
+- each defect, with its root cause, corrective action, audited keyframes and the Muse Image diagram.
+
+The file opens offline in any browser, and its **Print / save as PDF** button produces a PDF to hand to the line supervisor.
+
+**Compare cycles** appears when another preset checks the same tool and part pairs, for example the two mounting-plate cycles.
+- It runs the reference cycle under *this* cycle's rules, so both are judged the same way. A cached reference opens instantly.
+- The two cycles are shown side by side:
+  - the masked videos, with **Play both from start**;
+  - each step's contact lanes on one shared time axis. A hatched area means that cycle had already ended.
+  - a table of qualifying contacts, total contact time, cycle time and compliance, with this cycle's shortfalls in red.
+- When more than one reference fits, pick it from the dropdown.
 
 ### Verdicts and statuses
 
@@ -293,8 +311,9 @@ See `backend/presets/plate_4screw_sop.txt` and `solder_joint_sop.txt` for exampl
 | "Backend unreachable" | The UI can't reach the API | Start the backend (`uvicorn main:app --port 8000`) |
 | "This server replays recorded analyses" | The server has no `META_API_KEY` | Presets still replay. Add a key to analyze new clips or edited rules |
 | "… budget for today is used up" | The public daily budget is spent | Try again tomorrow, or run it yourself |
-| "Video is 34s long; the public demo accepts up to 20s" | The clip is over the cap | Trim it to one cycle |
-| "These rules need a fresh SAM 3.1 pass over this preset's 41s clip" | Edited rules on a long preset, on a capped server | Analyze the preset's original rules, upload a short clip, or run it yourself |
+| "Video is 75s long; the public demo accepts up to 60s" | The clip is over the cap | Trim it to one cycle |
+| "These rules need a fresh SAM 3.1 pass over this preset's clip" | Edited rules on a preset longer than the server's clip cap | Analyze the preset's original rules, upload a shorter clip, or run it yourself |
+| An upload stopped with an error partway through | The free server restarted, for example after sleeping | Upload it again, and keep the tab open until it finishes |
 | A rule finds no contacts at all | SAM didn't find one of the objects | Rename it to what it looks like ("metal plate", not "bracket") and recompile |
 | The first page load takes a minute | The free server was asleep | Wait. The next loads are instant |
 
@@ -346,13 +365,13 @@ The repo includes a `render.yaml` Blueprint.
 3. Without a key, the site replays the recorded presets and never calls the API.
 
 The free plan has 512 MB of RAM and 0.1 CPU. The Blueprint therefore:
-- limits clips to 20 s and 50 MB;
+- limits clips to 60 s and 100 MB;
 - runs one job at a time;
 - decodes masks one prompt at a time;
 - encodes video on one thread;
 - limits Python's memory arenas.
 
-Tested in a container with the same limits, a 15 s upload peaks below the memory cap and takes about 10 minutes end to end.
+Masks are memory-mapped and decoded one frame at a time, and SAM's output streams to disk, so memory stays flat as clips get longer.
 
 ### Configuration
 
@@ -412,7 +431,8 @@ backend/
   tests/                  kinematics, rule engine and schema tests
 frontend/src/
   app/page.tsx            responsive workbench
-  components/             SopEditorPanel, AnnotatedVideoCanvas, TelemetryTimeline, AuditVerdictPanel
+  components/             SopEditorPanel, AnnotatedVideoCanvas, TelemetryTimeline, AuditVerdictPanel, CompareCycles
+  lib/report.ts           self-contained HTML QA report with embedded keyframes and diagram
 Dockerfile                single-container build (static frontend served by FastAPI)
 render.yaml               Render Blueprint for the hosted demo
 ```
