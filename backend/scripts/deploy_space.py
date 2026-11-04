@@ -62,12 +62,10 @@ def main() -> None:
 
     api.create_repo(repo_id, repo_type="space", space_sdk="docker", exist_ok=True)
     api.add_space_secret(repo_id, "META_API_KEY", config.META_API_KEY)
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=REPO_ROOT,
-                            capture_output=True, text=True, check=True).stdout.strip()
     with tempfile.TemporaryDirectory() as tmp:
         stage(Path(tmp))
         api.upload_folder(repo_id=repo_id, repo_type="space", folder_path=tmp,
-                          commit_message=f"Deploy {commit}", delete_patterns=["*"])
+                          commit_message="Deploy KineSight from GitHub main", delete_patterns=["*"])
     print(f"https://huggingface.co/spaces/{repo_id}")
     print(f"https://{repo_id.replace('/', '-').replace('_', '-').lower()}.hf.space")
 
