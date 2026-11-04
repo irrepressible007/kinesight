@@ -104,7 +104,7 @@ export default function AnnotatedVideoCanvas({ videoUrl, tracks, videoRef, onTim
 
   return (
     <div className="flex h-full flex-col">
-      <div className="relative flex-1 overflow-hidden rounded-lg bg-black">
+      <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-black xl:aspect-auto xl:min-h-0 xl:flex-1">
         {videoUrl ? (
           <>
             <video
@@ -125,7 +125,7 @@ export default function AnnotatedVideoCanvas({ videoUrl, tracks, videoRef, onTim
           <div className="flex h-full items-center justify-center text-sm text-ink-3">Select a preset or upload a video</div>
         )}
       </div>
-      <div className="mt-2 flex items-center gap-3">
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
         <button
           onClick={toggle}
           className="flex h-8 w-8 items-center justify-center rounded-md border border-line-2 bg-panel-2 text-ink hover:border-accent"
@@ -140,16 +140,16 @@ export default function AnnotatedVideoCanvas({ videoUrl, tracks, videoRef, onTim
         >
           <RotateCcw size={14} />
         </button>
-        <span className="num text-sm text-ink">
+        <span className="num whitespace-nowrap text-sm text-ink">
           {time.toFixed(2)}
           <span className="text-ink-3"> / {duration ? duration.toFixed(2) : "--"} s</span>
         </span>
         {tracks && (
-          <span className="num text-xs text-ink-3">
+          <span className="num hidden whitespace-nowrap text-xs text-ink-3 sm:inline">
             frame {Math.round(time * tracks.fps)} @ {tracks.fps} fps
           </span>
         )}
-        <div className="ml-auto flex flex-wrap gap-1.5">
+        <div className="flex w-full flex-wrap gap-1.5 sm:ml-auto sm:w-auto sm:justify-end">
           {tracks?.labels.map((label) => (
             <button
               key={label}

@@ -11,6 +11,7 @@ import type { CompiledSop, JobResult, Limits, Preset, Tracks } from "@/lib/types
 
 export default function Workbench() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const resultsRef = useRef<HTMLElement | null>(null);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [presetId, setPresetId] = useState<string | null>(null);
   const [upload, setUpload] = useState<File | null>(null);
@@ -121,6 +122,10 @@ export default function Workbench() {
           setStage(job.result.cached ? "Served from cache" : "Analysis complete");
           const startAt = Number(new URLSearchParams(window.location.search).get("t"));
           if (startAt && videoRef.current) videoRef.current.currentTime = startAt;
+          // On phones the results sit below the rules, so bring them into view.
+          if (window.matchMedia("(max-width: 767px)").matches) {
+            resultsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+          }
           break;
         }
         if (job.status === "failed") throw new Error(job.error ?? "analysis failed");
@@ -162,8 +167,10 @@ export default function Workbench() {
   const preset = presets.find((p) => p.id === presetId);
   const videoUrl = result?.video_url ?? uploadUrl ?? preset?.video_url ?? null;
 
+  // Layouts: one scrolling column on phones, a sticky rules column beside the results on
+  // tablets and small laptops, and three fixed-height columns from 1280px up.
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    <div className="flex min-h-dvh flex-col pb-24 md:pb-0 xl:h-screen xl:min-h-0 xl:overflow-hidden">
       <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line px-4">
         <div className="flex items-center gap-2">
           <div className="flex h-6 w-6 items-center justify-center rounded bg-accent text-black">
@@ -171,7 +178,7 @@ export default function Workbench() {
           </div>
           <span className="text-[15px] font-bold tracking-tight">KineSight</span>
         </div>
-        <span className="hidden text-[12px] text-ink-3 md:inline">Sensorless visual telemetry & SOP compliance engine</span>
+        <span className="hidden text-[12px] text-ink-3 lg:inline">Sensorless visual telemetry & SOP compliance engine</span>
         <div className="num ml-auto hidden items-center gap-1.5 text-[10.5px] text-ink-2 sm:flex">
           {["SAM 3.1", "OpenCV kinematics", "Muse Spark 1.3", "Muse Image"].map((m) => (
             <span key={m} className="rounded-full border border-line-2 px-2 py-0.5">
@@ -185,8 +192,8 @@ export default function Workbench() {
         <div className="shrink-0 border-b border-fail/40 bg-fail/10 px-4 py-1.5 text-[12px] text-fail">{error}</div>
       )}
 
-      <main className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-auto p-3 lg:grid-cols-[300px_minmax(0,1fr)_370px] lg:overflow-hidden">
-        <section className="panel min-h-0 p-3">
+      <main className="grid flex-1 grid-cols-1 gap-3 p-3 md:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] md:grid-rows-[auto_1fr] xl:min-h-0 xl:grid-cols-[280px_minmax(0,1fr)_340px] xl:grid-rows-[minmax(0,1fr)] 2xl:grid-cols-[300px_minmax(0,1fr)_380px]">
+        <section className="panel flex flex-col p-3 md:sticky md:top-3 md:row-span-2 md:max-h-[calc(100dvh-4.5rem)] md:self-start xl:static xl:row-span-1 xl:max-h-none xl:min-h-0 xl:self-stretch">
           <SopEditorPanel
             presets={presets}
             presetId={presetId}
@@ -212,8 +219,8 @@ export default function Workbench() {
           />
         </section>
 
-        <section className="flex min-h-0 flex-col gap-3">
-          <div className="panel min-h-[320px] flex-1 p-3">
+        <section ref={resultsRef} className="flex scroll-mt-3 flex-col gap-3 xl:min-h-0">
+          <div className="panel p-3 xl:min-h-[260px] xl:flex-1">
             <AnnotatedVideoCanvas
               videoUrl={videoUrl}
               tracks={tracks}
@@ -223,18 +230,18 @@ export default function Workbench() {
               onToggle={toggle}
             />
           </div>
-          <div className="panel h-[250px] shrink-0 p-3">
+          <div className="panel shrink-0 p-3">
             {result && tracks ? (
               <TelemetryTimeline result={result} tracks={tracks} time={time} onSeek={seek} />
             ) : (
-              <div className="flex h-full items-center justify-center text-sm text-ink-3">
+              <div className="flex h-[200px] items-center justify-center px-4 text-center text-sm text-ink-3">
                 {running ? stage : "Velocity and contact timeline appear after analysis"}
               </div>
             )}
           </div>
         </section>
 
-        <section className="panel min-h-0 p-3">
+        <section className="panel p-3 xl:min-h-0">
           <AuditVerdictPanel result={result} onSeek={seek} />
         </section>
       </main>

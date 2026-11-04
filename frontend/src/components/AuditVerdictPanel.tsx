@@ -23,7 +23,7 @@ export default function AuditVerdictPanel({ result, onSeek }: Props) {
 
   if (!result) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center text-sm text-ink-3">
+      <div className="flex h-full min-h-[180px] flex-col items-center justify-center gap-2 px-6 text-center text-sm text-ink-3">
         <ShieldQuestion size={28} className="text-ink-3" />
         Run an analysis to see the QA verdict, root cause and corrective diagram.
       </div>
@@ -36,7 +36,7 @@ export default function AuditVerdictPanel({ result, onSeek }: Props) {
   const totalMs = Object.values(result.timings_ms).reduce((a, b) => a + b, 0);
 
   return (
-    <div className="flex h-full flex-col gap-3 overflow-y-auto pr-1">
+    <div className="flex h-full flex-col gap-3 xl:overflow-y-auto xl:pr-1">
       <div className="rounded-lg border p-3" style={{ borderColor: color, background: `color-mix(in srgb, ${color} 8%, transparent)` }}>
         <div className="flex items-center justify-between">
           <div>
@@ -180,7 +180,7 @@ export default function AuditVerdictPanel({ result, onSeek }: Props) {
       </div>
 
       {zoom && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-8" onClick={() => setZoom(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/85 p-4 sm:p-8" onClick={() => setZoom(null)}>
           <button className="absolute right-5 top-5 text-ink" aria-label="Close">
             <X size={22} />
           </button>

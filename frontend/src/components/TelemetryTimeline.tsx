@@ -37,13 +37,13 @@ export default function TelemetryTimeline({ result, tracks, time, onSeek }: Prop
 
   return (
     <div className="flex h-full flex-col">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
         <span className="label">Kinematic telemetry · tool speed (frame diagonals / s)</span>
         <span className="num text-[11px] text-ink-3">
           dashed line = stationary-work threshold {tracks.stationary_speed}
         </span>
       </div>
-      <div className="relative mt-1 min-h-0 flex-1">
+      <div className="relative mt-1 h-[150px]">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart
             data={data}
@@ -99,7 +99,7 @@ export default function TelemetryTimeline({ result, tracks, time, onSeek }: Prop
           const defect = result.verdict.defects.find((d) => d.step_number === step.step_number);
           return (
             <div key={step.step_number}>
-              <div className="mb-0.5 flex items-center gap-2 text-[11px]">
+              <div className="mb-0.5 flex flex-wrap items-center gap-x-2 text-[11px]">
                 <span className="num text-ink-3">STEP {step.step_number}</span>
                 <span className="text-ink-2">
                   {step.actor} → {step.target}
