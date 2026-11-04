@@ -13,9 +13,9 @@ services:
       - key: LIVE_ANALYSIS
         value: "1"
       - key: MAX_VIDEO_SEC
-        value: "20"
+        value: "60"
       - key: MAX_UPLOAD_MB
-        value: "50"
+        value: "100"
       - key: MAX_CONCURRENT_JOBS
         value: "1"
       - key: SAM_DECODE_WORKERS

@@ -8,7 +8,7 @@ import hashlib
 import json
 import re
 import subprocess
-from collections.abc import Iterator, Mapping
+from collections.abc import Callable, Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -152,24 +152,56 @@ def segment_video(file_id: str, prompt: str, out_path: Path) -> None:
             if r.status_code in (429,) or r.status_code >= 500:
                 r.raise_for_status()
             raise RuntimeError(f"SAM request failed ({r.status_code}): {r.text[:500]}")
-        kind = None
-        for line in r.iter_lines():
-            if line.startswith("event: "):
-                kind = line[7:].strip()
-                continue
-            if not line.startswith("data: {"):
+        def wanted(kind: str | None) -> bool:
+            return kind in _ALWAYS_PARSED or (kind == _DONE and not wrote)
+
+        for kind, data in _sse(r, wanted):
+            if not data.startswith("{"):
                 continue
             if kind is None:  # no event line; fall back to the type inside the payload
-                kind = json.loads(line[6:]).get("type")
-            if kind == "response.output_text.delta":
-                out.write(json.loads(line[6:])["delta"])
+                kind = json.loads(data).get("type")
+            if kind == _DELTA:
+                out.write(json.loads(data)["delta"])
                 wrote = True
-            elif kind == "response.output_text.done" and not wrote:
-                out.write(json.loads(line[6:])["text"])
+            elif kind == _DONE and not wrote:
+                out.write(json.loads(data)["text"])
             elif kind in ("response.failed", "error"):
-                raise RuntimeError(f"SAM stream failed: {line[6:506]}")
-            kind = None
+                raise RuntimeError(f"SAM stream failed: {data[:500]}")
     part.replace(out_path)
+
+
+_DELTA, _DONE = "response.output_text.delta", "response.output_text.done"
+_ALWAYS_PARSED = {_DELTA, "response.failed", "error", None}
+
+
+def _sse(response: httpx.Response, wanted: Callable[[str | None], bool]) -> Iterator[tuple[str | None, str]]:
+    """Yield (event, data) for server-sent events that `wanted` accepts. Data lines of other
+    events are dropped as they stream in, never buffered whole: SAM's closing events repeat
+    the entire output, which for a minute-long clip of a large part is tens of MB."""
+    event: str | None = None
+    line, skipping = bytearray(), False
+    for chunk in response.iter_bytes():
+        start = 0
+        while start <= len(chunk):
+            end = chunk.find(b"\n", start)
+            if not skipping:
+                line += chunk[start:] if end < 0 else chunk[start:end]
+                if line.startswith(b"data:") and not wanted(event):
+                    skipping = True
+                    line.clear()
+            if end < 0:
+                break
+            if not skipping:
+                text = line.decode("utf-8").rstrip("\r")
+                if text.startswith("event:"):
+                    event = text[6:].strip()
+                elif text.startswith("data:"):
+                    yield event, text[5:].lstrip()
+                elif not text:
+                    event = None
+            line.clear()
+            skipping = False
+            start = end + 1
 
 
 def load_track(raw_path: Path) -> PromptTrack:
@@ -183,7 +215,9 @@ def load_track(raw_path: Path) -> PromptTrack:
     if not (index_path.exists() and bin_path.exists()):
         subprocess.run(["node", str(DECODER), str(raw_path), str(prefix)], check=True, capture_output=True)
     records = json.loads(index_path.read_text())["records"]
-    return PackedTrack(records, np.fromfile(bin_path, dtype=np.uint8))
+    # Memory-mapped: the OS pages masks in as frames are read and can drop them under pressure.
+    buf = np.memmap(bin_path, dtype=np.uint8, mode="r") if bin_path.stat().st_size else np.zeros(0, np.uint8)
+    return PackedTrack(records, buf)
 
 
 def _slug(prompt: str) -> str:

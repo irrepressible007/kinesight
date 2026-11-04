@@ -4,7 +4,7 @@
 // The Python parser decodes masks pixel by pixel and is far too slow for full videos.
 //
 // usage: node decode.mjs <sam_output.txt> <out_prefix>
-import { readFileSync, writeFileSync } from "node:fs";
+import { closeSync, openSync, readFileSync, writeFileSync, writeSync } from "node:fs";
 import { decodeMaskToRaster, formats, frameIndexOf } from "@meta-sam/parser";
 
 const [, , input, outPrefix] = process.argv;
@@ -12,8 +12,9 @@ const parser = formats.segmentation.video().createParser();
 parser.push(readFileSync(input, "utf8"), { emit: false });
 const { result } = parser.finish({ status: "completed" });
 
+// Masks go to disk as they are packed, so memory holds one raster at a time.
+const bin = openSync(`${outPrefix}.bin`, "w");
 const index = [];
-const chunks = [];
 let offset = 0;
 for (const rec of result.records) {
   if (rec.kind !== "mask") continue;
@@ -37,10 +38,10 @@ for (const rec of result.records) {
     o: offset,
     c: rec.confidence ?? null,
   });
-  chunks.push(packed);
+  writeSync(bin, packed);
   offset += packed.length;
 }
 
-writeFileSync(`${outPrefix}.bin`, Buffer.concat(chunks.map((c) => Buffer.from(c.buffer))));
+closeSync(bin);
 writeFileSync(`${outPrefix}.json`, JSON.stringify({ records: index, diagnostics: result.diagnostics.length }));
 console.log(`${index.length} masks`);
