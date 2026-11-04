@@ -1,4 +1,4 @@
-import type { CompiledSop, JobStatus, Preset, Tracks } from "./types";
+import type { CompiledSop, JobStatus, Limits, Preset, Tracks } from "./types";
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
 
@@ -20,6 +20,9 @@ async function json<T>(res: Response): Promise<T> {
   }
   return res.json();
 }
+
+export const getLimits = () =>
+  fetch(`${API_BASE}/api/health`).then((r) => json<{ limits: Limits }>(r)).then((h) => h.limits);
 
 export const getPresets = () => fetch(`${API_BASE}/api/presets`).then((r) => json<Preset[]>(r));
 

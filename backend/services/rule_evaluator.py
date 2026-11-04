@@ -80,9 +80,23 @@ def evaluate(sop: CompiledSop, intervals: dict[Pair, list[ContactInterval]],
             prev_start = first_start
             prev_end = own[-1].end_sec
 
-    passed = sum(r.status == "PASS" for r in results)
-    score = round(100.0 * passed / len(results), 1) if results else 0.0
-    return results, anomalies, score
+    return results, anomalies, compliance_score(results)
+
+
+def step_credit(result: StepResult) -> float:
+    """A passed step earns 1. A count or duration shortfall earns the share of required
+    contacts that qualified, so 3 of 4 screws earns 0.75. An out-of-order step earns 0
+    because the sequence itself is the requirement."""
+    if result.status == "PASS":
+        return 1.0
+    if result.status == "FAIL_ORDER":
+        return 0.0
+    return min(result.contacts_detected, result.contacts_required) / result.contacts_required
+
+
+def compliance_score(results: list[StepResult]) -> float:
+    """Mean step credit, in percent."""
+    return round(100.0 * sum(step_credit(r) for r in results) / len(results), 1) if results else 0.0
 
 
 def _anomaly(step_number: int, status: StepStatus, own: list[ContactInterval],

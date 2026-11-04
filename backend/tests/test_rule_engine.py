@@ -29,7 +29,8 @@ def test_spec_example_three_of_four_screws():
     results, anomalies, score = evaluate(sop(PASTE, SINK, SCREWS), intervals, 22.0)
     assert [r.status for r in results] == ["PASS", "PASS", "FAIL_COUNT_SHORTFALL"]
     assert results[2].contacts_detected == 3
-    assert score == pytest.approx(66.7)
+    # Partial credit: (1 + 1 + 3/4) / 3 steps.
+    assert score == pytest.approx(91.7)
     assert len(anomalies) == 1
     assert anomalies[0].timestamp_sec == 16.6 and anomalies[0].severity == "CRITICAL"
 
@@ -81,3 +82,13 @@ def test_shared_pair_steps_consume_intervals_in_order():
     assert results[0].status == "PASS"
     assert results[1].status == "FAIL_COUNT_SHORTFALL"
     assert results[1].contact_intervals == [ivs[2].model_copy(update={"meets_min_duration": True})]
+
+
+def test_partial_credit_counts_qualifying_contacts():
+    intervals = {("screwdriver", "heatsink"): [iv(1, 3), iv(4, 6), iv(7, 9)]}
+    _, _, score = evaluate(sop(SCREWS), intervals, 12.0)
+    assert score == 75.0
+    # A contact shorter than the minimum earns nothing.
+    intervals = {("screwdriver", "heatsink"): [iv(1, 3), iv(4, 6), iv(7, 9), iv(10, 10.5)]}
+    results, _, score = evaluate(sop(SCREWS), intervals, 12.0)
+    assert results[0].status == "FAIL_SHORT_DURATION" and score == 75.0

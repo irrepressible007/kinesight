@@ -1,0 +1,21 @@
+# Secrets and local-only files
+.env
+.env.*
+.git
+*.docx
+SUBMISSION_DRAFT.md
+
+# Dependencies and build output (rebuilt in the image)
+**/node_modules
+**/__pycache__
+**/.pytest_cache
+backend/.venv
+frontend/.next
+frontend/out
+frontend/tsconfig.tsbuildinfo
+
+# Local runtime data
+backend/cache
+backend/*.db
+backend/presets/raw
+backend/presets/*/cache/analysis.mp4

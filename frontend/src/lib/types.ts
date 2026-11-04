@@ -117,3 +117,11 @@ export interface Preset {
   video_url: string;
   source: { credit: string; url: string };
 }
+
+export interface Limits {
+  max_video_sec: number | null;
+  max_upload_mb: number | null;
+  video_left: number | null;
+  rules_left: number | null;
+  compile_left: number | null;
+}

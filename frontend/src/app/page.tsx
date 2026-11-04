@@ -6,8 +6,8 @@ import AnnotatedVideoCanvas from "@/components/AnnotatedVideoCanvas";
 import AuditVerdictPanel from "@/components/AuditVerdictPanel";
 import SopEditorPanel from "@/components/SopEditorPanel";
 import TelemetryTimeline from "@/components/TelemetryTimeline";
-import { compileSop, compileSopFile, getJob, getPresets, getTracks, startJob } from "@/lib/api";
-import type { CompiledSop, JobResult, Preset, Tracks } from "@/lib/types";
+import { compileSop, compileSopFile, getJob, getLimits, getPresets, getTracks, startJob } from "@/lib/api";
+import type { CompiledSop, JobResult, Limits, Preset, Tracks } from "@/lib/types";
 
 export default function Workbench() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -26,6 +26,10 @@ export default function Workbench() {
   const [time, setTime] = useState(0);
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [limits, setLimits] = useState<Limits | null>(null);
+  const refreshLimits = useCallback(() => {
+    getLimits().then(setLimits).catch(() => {});
+  }, []);
 
   const selectPreset = useCallback((p: Preset) => {
     setPresetId(p.id);
@@ -53,7 +57,8 @@ export default function Workbench() {
         autoRun.current = params.get("run") === "1";
       })
       .catch(() => setError("Backend unreachable. Start it with: uvicorn main:app --port 8000"));
-  }, [selectPreset]);
+    refreshLimits();
+  }, [selectPreset, refreshLimits]);
 
   const onUpload = (f: File) => {
     setUpload(f);
@@ -77,6 +82,7 @@ export default function Workbench() {
       setError(`Compile failed: ${(e as Error).message}`);
     } finally {
       setCompiling(false);
+      refreshLimits();
     }
   };
 
@@ -92,6 +98,7 @@ export default function Workbench() {
       setError(`Compile failed: ${(e as Error).message}`);
     } finally {
       setCompiling(false);
+      refreshLimits();
     }
   };
 
@@ -124,6 +131,7 @@ export default function Workbench() {
       setStage(null);
     } finally {
       setRunning(false);
+      refreshLimits();
     }
   };
 
@@ -200,6 +208,7 @@ export default function Workbench() {
             stage={stage}
             onAnalyze={onAnalyze}
             trackLabels={tracks?.labels ?? []}
+            limits={limits}
           />
         </section>
 

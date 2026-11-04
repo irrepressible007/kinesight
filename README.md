@@ -36,7 +36,7 @@ flowchart LR
    - **Tool speed** in frame diagonals per second, rolling-median smoothed over 0.6 s. It separates transit from stationary work and doesn't depend on resolution.
    - **Contact** as `sum(Dilate(Mask_tool, k) AND Solid(Mask_target))`. The target is taken as the union of per-instance convex hulls, because the operator's hand cuts a notch into the plate mask exactly where the work happens, and the hull restores it.
    - **Intervals**: a frame counts as contact when the overlap clears the threshold and the tool is below the work-speed threshold. Gaps under 0.8 s (brief occlusions) are bridged and blips under 0.6 s are dropped, giving discrete `start_sec / end_sec / duration_sec` intervals, each with where on the frame the contact happened.
-4. **Rule evaluator (`rule_evaluator.py`).** It flags `FAIL_MISSING`, `FAIL_COUNT_SHORTFALL`, `FAIL_SHORT_DURATION` and `FAIL_ORDER`, and computes the compliance score as passed steps ÷ steps.
+4. **Rule evaluator (`rule_evaluator.py`).** It flags `FAIL_MISSING`, `FAIL_COUNT_SHORTFALL`, `FAIL_SHORT_DURATION` and `FAIL_ORDER`, and computes the compliance score as the mean step credit. A passed step earns 1. A count or duration shortfall earns the share of required contacts that qualified, so 3 of 4 screws earns 0.75. An out-of-order step earns 0.
 5. **Audit (Muse Spark 1.3 + Muse Image).** Only for flagged steps: three keyframes around the anomaly, with SAM contours drawn on, go to Muse Spark along with the telemetry and the SOP rule. It decides whether this is a genuine defect or an occlusion artifact, names where it happened, and writes the corrective action plus a prompt for Muse Image, which draws the work-instruction diagram.
 
 ### Engineering guarantees
@@ -50,7 +50,7 @@ flowchart LR
 
 | Preset | Footage | Result |
 |---|---|---|
-| Mounting plate: operator skips a screw | Pexels 856232, reversed and trimmed at 27 s | **FAIL**, 3 of 4 screw contacts. Muse Spark confirms the top-right hole is empty |
+| Mounting plate: operator skips a screw | Pexels 856232, reversed and trimmed at 27 s | **FAIL**, 3 of 4 screw contacts (75% compliance). Muse Spark confirms the top-right hole is empty |
 | Mounting plate: compliant cycle | Pexels 856232, reversed | **PASS**, 4 of 4 |
 | Soldering bench: flux dip + joint dwell | Pexels 7314032 | **PASS**, flux 3.4 s, joint 14.9 s |
 
@@ -81,11 +81,20 @@ npm run dev                       # http://localhost:3000
 Open `http://localhost:3000`, pick a preset and press **Analyze video**. `?preset=plate_4screw_defect&run=1` runs a preset on load. To try your own footage, upload a bench video, paste or upload the SOP, compile it, check the rules, and analyze.
 
 ```bash
-cd backend && python -m pytest -q          # 23 unit tests: kinematics, rules, schemas
+cd backend && python -m pytest -q          # 24 unit tests: kinematics, rules, schemas
 python scripts/build_presets.py            # rebuild presets from Pexels and re-run the pipeline
 ```
 
 Thresholds live in `backend/config.py` and can be overridden from `.env` (`STATIONARY_SPEED`, `DILATE_FRAC`, `MAX_GAP_SEC`, …).
+
+### Docker (single container)
+
+```bash
+docker build -t kinesight .
+docker run -p 7860:7860 -e META_API_KEY=your-key kinesight    # http://localhost:7860
+```
+
+The image serves the static frontend and the API on one port. Guards for a public deployment are on by default: daily budgets for new video analyses, preset re-runs with edited rules, and SOP compiles, plus 60 s / 200 MB upload caps (`DAILY_VIDEO_JOBS`, `DAILY_RULE_JOBS`, `DAILY_COMPILES`, `MAX_VIDEO_SEC`, `MAX_UPLOAD_MB`; `0` = unlimited). `python scripts/deploy_space.py` publishes the committed tree to a Hugging Face Docker Space and stores the key as a Space secret.
 
 ## Repository layout
 
@@ -94,7 +103,7 @@ backend/
   main.py                 FastAPI: presets, SOP compile, analysis jobs, static media
   config.py               model IDs and kinematic thresholds
   schemas.py              Pydantic contracts: CompiledSop, Telemetry, AuditVerdict
-  database.py             SQLite job records
+  database.py             SQLite job records and daily usage budgets
   services/
     sop_compiler.py       Muse Spark 1.3: SOP text/PDF -> rules
     sam_tracker.py        SAM 3.1 upload, streaming segmentation, mask decoding
@@ -104,10 +113,12 @@ backend/
     pipeline.py           orchestration and result cache
   sam_decoder/decode.mjs  @meta-sam/parser -> bit-packed masks for NumPy
   presets/                demo clips, SOPs and cached results
+  scripts/                preset builder, Hugging Face Space deploy
   tests/
 frontend/src/
   app/page.tsx            three-panel workbench
   components/             SopEditorPanel, AnnotatedVideoCanvas, TelemetryTimeline, AuditVerdictPanel
+Dockerfile                single-container build (static frontend served by FastAPI)
 ```
 
 ## Meta models used

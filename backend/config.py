@@ -32,8 +32,19 @@ SPEED_WINDOW_SEC = _float("SPEED_WINDOW_SEC", 0.6)  # rolling-median window for 
 MAX_GAP_SEC = _float("MAX_GAP_SEC", 0.8)  # contact gaps shorter than this are merged
 MIN_INTERVAL_SEC = _float("MIN_INTERVAL_SEC", 0.6)  # shorter contacts are discarded as noise
 
+# Guards for a public deployment that spends the owner's API credit. 0 means unlimited,
+# the default for local runs.
+DAILY_VIDEO_JOBS = int(os.getenv("DAILY_VIDEO_JOBS", 0))  # analyses of newly uploaded videos
+DAILY_RULE_JOBS = int(os.getenv("DAILY_RULE_JOBS", 0))  # preset re-runs with edited rules
+DAILY_COMPILES = int(os.getenv("DAILY_COMPILES", 0))  # SOP compiles not already cached
+MAX_VIDEO_SEC = _float("MAX_VIDEO_SEC", 0)
+MAX_UPLOAD_MB = _float("MAX_UPLOAD_MB", 0)
+MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", 2))
+
 CACHE_DIR = BACKEND_DIR / "cache"
 PRESETS_DIR = BACKEND_DIR / "presets"
 DB_PATH = BACKEND_DIR / "kinesight.db"
+# Static export of the frontend; served at / when present (single-container deployment).
+FRONTEND_DIR = Path(os.getenv("FRONTEND_DIR", BACKEND_DIR.parent / "frontend" / "out"))
 
 CACHE_DIR.mkdir(exist_ok=True)

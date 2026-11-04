@@ -22,7 +22,43 @@ _conn.execute("""
         updated_at REAL
     )
 """)
+_conn.execute("""
+    CREATE TABLE IF NOT EXISTS usage (
+        day TEXT NOT NULL,             -- UTC date
+        kind TEXT NOT NULL,            -- video | rules | compile
+        n INTEGER NOT NULL,
+        PRIMARY KEY (day, kind)
+    )
+""")
 _conn.commit()
+
+
+def _today() -> str:
+    return time.strftime("%Y-%m-%d", time.gmtime())
+
+
+def take_quota(kind: str, limit: int) -> bool:
+    """Count one use against a daily budget. False once the budget is spent; 0 = unlimited."""
+    if limit <= 0:
+        return True
+    with _lock:
+        row = _conn.execute("SELECT n FROM usage WHERE day = ? AND kind = ?", (_today(), kind)).fetchone()
+        if row and row["n"] >= limit:
+            return False
+        _conn.execute(
+            "INSERT INTO usage (day, kind, n) VALUES (?, ?, 1) ON CONFLICT(day, kind) DO UPDATE SET n = n + 1",
+            (_today(), kind),
+        )
+        _conn.commit()
+    return True
+
+
+def quota_left(kind: str, limit: int) -> int | None:
+    if limit <= 0:
+        return None
+    with _lock:
+        row = _conn.execute("SELECT n FROM usage WHERE day = ? AND kind = ?", (_today(), kind)).fetchone()
+    return max(0, limit - (row["n"] if row else 0))
 
 
 def create_job(job_id: str, video_sha: str, sop_sha: str) -> None:

@@ -3,7 +3,7 @@
 import { FileUp, Film, Loader2, Play, Sparkles, X } from "lucide-react";
 import { useRef } from "react";
 import { colorFor } from "@/lib/api";
-import type { CompiledSop, Preset, SopStep } from "@/lib/types";
+import type { CompiledSop, Limits, Preset, SopStep } from "@/lib/types";
 
 interface Props {
   presets: Preset[];
@@ -23,6 +23,7 @@ interface Props {
   stage: string | null;
   onAnalyze: () => void;
   trackLabels: string[];
+  limits: Limits | null;
 }
 
 export default function SopEditorPanel(p: Props) {
@@ -67,6 +68,12 @@ export default function SopEditorPanel(p: Props) {
             className="hidden"
             onChange={(e) => e.target.files?.[0] && p.onUpload(e.target.files[0])}
           />
+          {p.limits?.video_left != null && (
+            <div className="num px-0.5 text-[10.5px] leading-snug text-ink-3">
+              Public demo: clips up to {p.limits.max_video_sec ?? "∞"}s · {p.limits.video_left} live video
+              analyses and {p.limits.compile_left} new compiles left today
+            </div>
+          )}
         </div>
       </div>
 

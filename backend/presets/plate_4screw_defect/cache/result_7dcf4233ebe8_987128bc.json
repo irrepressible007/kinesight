@@ -78,7 +78,7 @@
  "verdict": {
   "overall_status": "FAIL",
   "cycle_time_sec": 27.0,
-  "compliance_score": 0.0,
+  "compliance_score": 75.0,
   "defects": [
    {
     "step_number": 1,
