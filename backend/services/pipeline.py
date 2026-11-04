@@ -21,6 +21,15 @@ CONTEXT_PROMPTS = ["hand"]
 Progress = Callable[[str], None]
 
 
+def prompts_for(sop: CompiledSop) -> list[str]:
+    return list(dict.fromkeys(sop.sam_prompts + CONTEXT_PROMPTS))
+
+
+def needs_segmentation(work_dir: Path, sop: CompiledSop) -> bool:
+    """True when some prompt has no cached SAM output, so a run would call SAM 3.1."""
+    return any(not sam_tracker.raw_path(work_dir, p).exists() for p in prompts_for(sop))
+
+
 def settings_fingerprint() -> str:
     keys = ["FPS_RATE", "ANALYSIS_WIDTH", "DILATE_FRAC", "OVERLAP_FRAC", "STATIONARY_SPEED",
             "SPEED_WINDOW_SEC", "MAX_GAP_SEC", "MIN_INTERVAL_SEC", "SPARK_MODEL", "IMAGE_MODEL"]
@@ -42,7 +51,8 @@ def make_playback_video(src: Path, dst: Path) -> Path:
         subprocess.run(
             ["ffmpeg", "-v", "error", "-y", "-i", str(src),
              "-vf", f"scale='min({config.ANALYSIS_WIDTH},iw)':-2", "-an", "-c:v", "libx264",
-             "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dst)],
+             "-preset", "veryfast", "-crf", "23", "-threads", config.FFMPEG_THREADS,
+             "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dst)],
             check=True,
         )
     return dst
@@ -82,7 +92,7 @@ def run(job_id: str, video_path: Path, sop: CompiledSop, work_dir: Path, url_pre
     width, height, fps, total = sam_tracker.probe(analysis)
     lap("prepare")
 
-    prompts = list(dict.fromkeys(sop.sam_prompts + CONTEXT_PROMPTS))
+    prompts = prompts_for(sop)
     progress(f"Segmenting {len(prompts)} objects with SAM 3.1")
     tracks = sam_tracker.track_prompts(analysis, prompts, work_dir,
                                        on_progress=lambda p: progress(f"SAM 3.1 finished '{p}'"))

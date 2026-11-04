@@ -33,15 +33,17 @@ MAX_GAP_SEC = _float("MAX_GAP_SEC", 0.8)  # contact gaps shorter than this are m
 MIN_INTERVAL_SEC = _float("MIN_INTERVAL_SEC", 0.6)  # shorter contacts are discarded as noise
 
 # Guards for a public deployment that spends the owner's API credit. 0 means unlimited,
-# the default for local runs. LIVE_ANALYSIS=0 turns the server into a replay of cached
-# results that never calls the Meta API (for small free hosts).
-LIVE_ANALYSIS = os.getenv("LIVE_ANALYSIS", "1").strip() != "0"
+# the default for local runs. LIVE_ANALYSIS=0, or a missing key, turns the server into a
+# replay of cached results that never calls the Meta API.
+LIVE_ANALYSIS = os.getenv("LIVE_ANALYSIS", "1").strip() != "0" and bool(META_API_KEY)
 DAILY_VIDEO_JOBS = int(os.getenv("DAILY_VIDEO_JOBS", 0))  # analyses of newly uploaded videos
 DAILY_RULE_JOBS = int(os.getenv("DAILY_RULE_JOBS", 0))  # preset re-runs with edited rules
 DAILY_COMPILES = int(os.getenv("DAILY_COMPILES", 0))  # SOP compiles not already cached
 MAX_VIDEO_SEC = _float("MAX_VIDEO_SEC", 0)
 MAX_UPLOAD_MB = _float("MAX_UPLOAD_MB", 0)
 MAX_CONCURRENT_JOBS = int(os.getenv("MAX_CONCURRENT_JOBS", 2))
+FFMPEG_THREADS = os.getenv("FFMPEG_THREADS", "0").strip()  # 0 = ffmpeg's choice; each thread buffers frames
+SAM_DECODE_WORKERS = int(os.getenv("SAM_DECODE_WORKERS", 4))  # parallel mask decoders; 1 on 512 MB hosts
 
 CACHE_DIR = BACKEND_DIR / "cache"
 PRESETS_DIR = BACKEND_DIR / "presets"

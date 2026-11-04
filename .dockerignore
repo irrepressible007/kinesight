@@ -17,3 +17,4 @@ backend/cache
 backend/*.db
 backend/presets/raw
 backend/presets/*/cache/analysis.mp4
+backend/presets/*/cache/sam_*

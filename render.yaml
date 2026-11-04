@@ -1,5 +1,7 @@
-# Render Blueprint: the free plan (512 MB) hosts a replay of the cached preset analyses.
-# Live analysis needs more memory and a META_API_KEY; run locally or on a larger host for that.
+# Render Blueprint for the free plan (512 MB, 0.1 CPU).
+# Set META_API_KEY in the service's Environment tab to turn on uploads and live analysis,
+# capped by the daily budgets in the Dockerfile. Without a key the site replays the
+# recorded preset analyses and never calls the Meta API.
 services:
   - type: web
     name: kinesight
@@ -7,5 +9,18 @@ services:
     plan: free
     healthCheckPath: /api/health
     envVars:
+      # META_API_KEY is added by hand in the dashboard so it never lives in the repo.
       - key: LIVE_ANALYSIS
-        value: "0"
+        value: "1"
+      - key: MAX_VIDEO_SEC
+        value: "20"
+      - key: MAX_UPLOAD_MB
+        value: "50"
+      - key: MAX_CONCURRENT_JOBS
+        value: "1"
+      - key: SAM_DECODE_WORKERS
+        value: "1"
+      - key: FFMPEG_THREADS
+        value: "1"
+      - key: MALLOC_ARENA_MAX
+        value: "2"

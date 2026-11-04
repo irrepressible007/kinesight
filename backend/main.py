@@ -42,8 +42,8 @@ BUDGET_SPENT = {
 }
 
 
-REPLAY_ONLY = ("This hosted demo replays recorded results and makes no live model calls. "
-               "Clone the repo to compile new SOPs, edit rules or analyze your own video.")
+REPLAY_ONLY = ("This server replays recorded results and makes no live model calls (no META_API_KEY). "
+               "Run KineSight with a key to compile new SOPs, edit rules or analyze your own video.")
 
 
 def spend(kind: str) -> None:
@@ -142,11 +142,15 @@ _results: dict[str, JobResult] = {}
 _workers = threading.BoundedSemaphore(max(1, config.MAX_CONCURRENT_JOBS))
 
 
-def _run_job(job_id: str, video: Path, sop: CompiledSop, work_dir: Path, url_prefix: str, video_url: str):
+def _run_job(job_id: str, source: Path, video: Path, sop: CompiledSop, work_dir: Path, url_prefix: str,
+             video_url: str):
     database.update_job(job_id, stage="Waiting for a free worker")
     try:
         with _workers:
-            database.update_job(job_id, status="running")
+            database.update_job(job_id, status="running", stage="Preparing video")
+            # Encoded here rather than in the request: on a slow host it takes minutes.
+            if not video.exists():
+                pipeline.make_playback_video(source, video)
             result = pipeline.run(job_id, video, sop, work_dir, url_prefix, video_url,
                                   progress=lambda stage: database.update_job(job_id, stage=stage))
         _results[job_id] = result
@@ -192,9 +196,16 @@ def create_job(sop: str = Form(...), preset_id: str | None = Form(None), video: 
         raise HTTPException(400, "Provide a preset_id or a video file")
 
     hit = pipeline.cached_result(work_dir, compiled)
+    if not hit and preset_id and config.MAX_VIDEO_SEC and pipeline.needs_segmentation(work_dir, compiled):
+        # Without cached SAM output the preset is segmented from scratch; hold it to the clip cap.
+        duration = _duration(source)
+        if duration > config.MAX_VIDEO_SEC:
+            raise HTTPException(413, f"These rules need a fresh SAM 3.1 pass over this preset's {duration:.0f}s clip, "
+                                     f"and this server analyzes clips up to {config.MAX_VIDEO_SEC:.0f}s. Upload a "
+                                     "shorter clip, or run KineSight locally.")
     if not hit:
         spend("rules" if preset_id else "video")
-    if not video_path.exists():
+    elif not video_path.exists():
         pipeline.make_playback_video(source, video_path)
 
     job_id = uuid.uuid4().hex[:12]
@@ -204,7 +215,7 @@ def create_job(sop: str = Form(...), preset_id: str | None = Form(None), video: 
         _results[job_id] = hit
         database.update_job(job_id, status="done", stage="Served from cache")
     else:
-        threading.Thread(target=_run_job, args=(job_id, video_path, compiled, work_dir, url_prefix, video_url),
+        threading.Thread(target=_run_job, args=(job_id, source, video_path, compiled, work_dir, url_prefix, video_url),
                          daemon=True).start()
     return {"job_id": job_id}
 
@@ -225,10 +236,7 @@ def _save_upload(video: UploadFile, suffix: str) -> Path:
         raise HTTPException(413, f"Video is larger than {config.MAX_UPLOAD_MB:.0f} MB")
     if config.MAX_VIDEO_SEC:
         try:
-            duration = float(subprocess.run(
-                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
-                capture_output=True, text=True, check=True,
-            ).stdout.strip())
+            duration = _duration(path)
         except (subprocess.CalledProcessError, ValueError):
             path.unlink()
             raise HTTPException(415, "Could not read that video file") from None
@@ -236,6 +244,13 @@ def _save_upload(video: UploadFile, suffix: str) -> Path:
             path.unlink()
             raise HTTPException(413, f"Video is {duration:.0f}s long; the public demo accepts up to {config.MAX_VIDEO_SEC:.0f}s")
     return path
+
+
+def _duration(path: Path) -> float:
+    return float(subprocess.run(
+        ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", str(path)],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip())
 
 
 @app.get("/api/jobs/{job_id}")

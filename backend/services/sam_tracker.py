@@ -8,6 +8,7 @@ import hashlib
 import json
 import re
 import subprocess
+from collections.abc import Iterator, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
@@ -34,7 +35,37 @@ class Instance:
 
 
 # frame index -> instances of one prompt in that frame
-PromptTrack = dict[int, list[Instance]]
+PromptTrack = Mapping[int, list[Instance]]
+
+
+class PackedTrack(Mapping[int, list[Instance]]):
+    """A prompt's instances, unpacked from the decoder's bit-packed masks only when a frame
+    is read. Unpacked up front, a clip where a large part fills the frame needs hundreds
+    of MB, more than a small host has."""
+
+    def __init__(self, records: list[dict], buf: np.ndarray):
+        self._buf = buf
+        self._frames: dict[int, list[dict]] = {}
+        for r in records:
+            self._frames.setdefault(r["f"], []).append(r)
+
+    def __getitem__(self, frame: int) -> list[Instance]:
+        return [self._instance(r) for r in self._frames[frame]]
+
+    def __iter__(self) -> Iterator[int]:
+        return iter(self._frames)
+
+    def __len__(self) -> int:
+        return len(self._frames)
+
+    def _instance(self, r: dict) -> Instance:
+        n = r["w"] * r["h"]
+        mask = np.unpackbits(self._buf[r["o"]: r["o"] + (n + 7) // 8], count=n).reshape(r["h"], r["w"])
+        # Large masks are downscaled by SAM; stretch the raster back over its box.
+        box_w, box_h = r["r"] - r["l"], r["b"] - r["t"]
+        if box_w > 0 and box_h > 0 and (box_w, box_h) != (r["w"], r["h"]):
+            mask = cv2.resize(mask, (box_w, box_h), interpolation=cv2.INTER_NEAREST)
+        return Instance(r["id"], r["l"], r["t"], mask)
 
 
 def file_sha256(path: Path) -> str:
@@ -65,7 +96,7 @@ def make_analysis_video(src: Path, dst: Path, fps: float = config.FPS_RATE) -> P
     subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-i", str(src),
          "-vf", f"fps={fps},scale='min({config.ANALYSIS_WIDTH},iw)':-2",
-         "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+         "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-threads", config.FFMPEG_THREADS,
          "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dst)],
         check=True,
     )
@@ -93,8 +124,12 @@ def upload_video(path: Path) -> str:
 
 
 @retry(retry=retry_if_exception_type(_RETRYABLE), wait=wait_exponential(min=2, max=30), stop=stop_after_attempt(4))
-def segment_video(file_id: str, prompt: str) -> str:
-    """Run one concept prompt over an uploaded video and return SAM's raw output text."""
+def segment_video(file_id: str, prompt: str, out_path: Path) -> None:
+    """Run one concept prompt over an uploaded video and save SAM's raw output text.
+
+    The text runs to tens of MB for a large part, and the closing events repeat all of it,
+    so deltas go straight to disk and only the events that matter are parsed.
+    """
     body = {
         "model": config.SAM_MODEL,
         "stream": True,
@@ -108,26 +143,33 @@ def segment_video(file_id: str, prompt: str) -> str:
             ],
         }],
     }
-    parts: list[str] = []
-    final: str | None = None
-    with httpx.stream("POST", f"{config.META_BASE_URL}/responses", headers=_headers(), json=body, timeout=900) as r:
+    part = out_path.with_suffix(".part")
+    wrote = False
+    with httpx.stream("POST", f"{config.META_BASE_URL}/responses", headers=_headers(), json=body,
+                      timeout=900) as r, open(part, "w", encoding="utf-8") as out:
         if r.status_code >= 400:
             r.read()
             if r.status_code in (429,) or r.status_code >= 500:
                 r.raise_for_status()
             raise RuntimeError(f"SAM request failed ({r.status_code}): {r.text[:500]}")
+        kind = None
         for line in r.iter_lines():
+            if line.startswith("event: "):
+                kind = line[7:].strip()
+                continue
             if not line.startswith("data: {"):
                 continue
-            event = json.loads(line[6:])
-            kind = event.get("type")
+            if kind is None:  # no event line; fall back to the type inside the payload
+                kind = json.loads(line[6:]).get("type")
             if kind == "response.output_text.delta":
-                parts.append(event["delta"])
-            elif kind == "response.output_text.done":
-                final = event["text"]
+                out.write(json.loads(line[6:])["delta"])
+                wrote = True
+            elif kind == "response.output_text.done" and not wrote:
+                out.write(json.loads(line[6:])["text"])
             elif kind in ("response.failed", "error"):
-                raise RuntimeError(f"SAM stream failed: {json.dumps(event)[:500]}")
-    return final if final is not None else "".join(parts)
+                raise RuntimeError(f"SAM stream failed: {line[6:506]}")
+            kind = None
+    part.replace(out_path)
 
 
 def load_track(raw_path: Path) -> PromptTrack:
@@ -141,40 +183,35 @@ def load_track(raw_path: Path) -> PromptTrack:
     if not (index_path.exists() and bin_path.exists()):
         subprocess.run(["node", str(DECODER), str(raw_path), str(prefix)], check=True, capture_output=True)
     records = json.loads(index_path.read_text())["records"]
-    buf = np.fromfile(bin_path, dtype=np.uint8)
-    track: PromptTrack = {}
-    for r in records:
-        n = r["w"] * r["h"]
-        mask = np.unpackbits(buf[r["o"]: r["o"] + (n + 7) // 8])[:n].reshape(r["h"], r["w"])
-        # Large masks are downscaled by SAM; stretch the raster back over its box.
-        box_w, box_h = r["r"] - r["l"], r["b"] - r["t"]
-        if box_w > 0 and box_h > 0 and (box_w, box_h) != (r["w"], r["h"]):
-            mask = cv2.resize(mask, (box_w, box_h), interpolation=cv2.INTER_NEAREST)
-        track.setdefault(r["f"], []).append(Instance(r["id"], r["l"], r["t"], mask))
-    return track
+    return PackedTrack(records, np.fromfile(bin_path, dtype=np.uint8))
 
 
 def _slug(prompt: str) -> str:
     return re.sub(r"[^a-z0-9]+", "_", prompt.lower()).strip("_")
 
 
+def raw_path(cache_dir: Path, prompt: str) -> Path:
+    """Where a prompt's raw SAM output is cached."""
+    return cache_dir / f"sam_{_slug(prompt)}.txt"
+
+
 def track_prompts(analysis_video: Path, prompts: list[str], cache_dir: Path,
                   on_progress=None) -> dict[str, PromptTrack]:
     """Segment every prompt, reusing cached SAM output where present."""
     cache_dir.mkdir(parents=True, exist_ok=True)
-    paths = {p: cache_dir / f"sam_{_slug(p)}.txt" for p in prompts}
+    paths = {p: raw_path(cache_dir, p) for p in prompts}
     missing = [p for p in prompts if not paths[p].exists()]
 
     if missing:
         file_id = upload_video(analysis_video)
 
         def run(p: str) -> None:
-            paths[p].write_text(segment_video(file_id, p), encoding="utf-8")
+            segment_video(file_id, p, paths[p])
             if on_progress:
                 on_progress(p)
 
         with ThreadPoolExecutor(max_workers=min(4, len(missing))) as pool:
             list(pool.map(run, missing))
 
-    with ThreadPoolExecutor(max_workers=len(prompts)) as pool:
+    with ThreadPoolExecutor(max_workers=max(1, min(len(prompts), config.SAM_DECODE_WORKERS))) as pool:
         return dict(zip(prompts, pool.map(load_track, paths.values())))

@@ -152,7 +152,8 @@ def analyze(tracks: dict[str, PromptTrack], width: int, height: int, fps: float,
     res = KinematicResult(width, height, fps, total_frames, tracks={lb: [] for lb in labels})
 
     for t in range(total_frames):
-        masks = {lb: place_mask(tracks[lb].get(t, []), height, width) for lb in labels}
+        frame = {lb: tracks[lb].get(t, []) for lb in labels}
+        masks = {lb: place_mask(frame[lb], height, width) for lb in labels}
         for lb, m in masks.items():
             c = centroid(m) if m is not None else None
             if c is not None:
@@ -166,7 +167,7 @@ def analyze(tracks: dict[str, PromptTrack], width: int, height: int, fps: float,
             if masks.get(a) is None or masks.get(b) is None:
                 continue
             if b not in solids:
-                solids[b] = solid_region(tracks[b].get(t, []), height, width)
+                solids[b] = solid_region(frame[b], height, width)
             n, loc = dilated_overlap(masks[a], solids[b], kernel_px)
             overlap[(a, b)][t] = n
             if loc is not None:

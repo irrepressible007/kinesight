@@ -1,18 +1,112 @@
 # KineSight
 
-**Sensorless visual telemetry and SOP compliance for assembly lines.** KineSight turns an ordinary overhead camera into a QA station. SAM 3.1 tracks every tool and part. A deterministic OpenCV/NumPy engine measures each contact to the frame. Muse Spark 1.3 audits only the moments where the math says a step went wrong.
+**Sensorless visual telemetry and SOP compliance for assembly lines.** KineSight turns an ordinary overhead camera into a QA station. SAM 3.1 tracks every tool and part. A deterministic OpenCV/NumPy engine measures each contact to the frame. Muse Spark 1.3 audits only the moments where the math says a step went wrong, and Muse Image draws the fix.
 
 Built for the Meta Global AI Developer Hackathon (Push the Frontier: Manufacturing, Hardware Assembly & Physical Systems).
 
-**Live demo: [kinesight.onrender.com](https://kinesight.onrender.com/?preset=plate_4screw_defect&run=1)**. It replays the three recorded preset analyses on Render's free plan. The first visit can take about a minute while the server wakes up. To compile your own SOPs or analyze your own footage, run it locally with a Meta API key (see [Running it](#running-it)).
+**Live demo: [kinesight.onrender.com](https://kinesight.onrender.com/?preset=plate_4screw_defect&run=1)**
+- It replays the three recorded preset analyses instantly.
+- It also accepts your own clips: up to 20 s each, within a small daily budget. A new clip takes a few minutes on the free server.
+- The first visit after a quiet spell can take about a minute while the server wakes up.
 
 ![Workbench](docs/workbench.png)
 
+## Contents
+
+1. [What KineSight does](#what-kinesight-does)
+2. [The problem](#the-problem)
+3. [How each Meta model gets us there](#how-each-meta-model-gets-us-there)
+4. [How it works](#how-it-works)
+5. [Demo presets](#demo-presets)
+6. [User manual](#user-manual)
+7. [Running it yourself](#running-it-yourself)
+8. [API reference](#api-reference)
+9. [Repository layout](#repository-layout)
+10. [Limitations and next steps](#limitations-and-next-steps)
+11. [Credits](#credits)
+
+## What KineSight does
+
+You give KineSight two things:
+- a **written procedure** (an SOP, as text or PDF);
+- a **video of one work cycle** at a bench.
+
+It answers four questions:
+1. **Which steps did the operator do, how many times, and for how long?** The answer is measured from pixel masks, frame by frame.
+2. **Does that meet the SOP?** Each step gets PASS or a specific failure: skipped, too few contacts, too short, or out of order. The cycle gets a compliance score.
+3. **If not, is it a real defect, and why did it happen?** The answer is a root cause and a corrective action in plain words, checked against the actual keyframes.
+4. **What should the operator do differently?** The answer is a generated work-instruction diagram.
+
+The outcome is zero-sensor quality assurance for manual assembly. It works with any camera, needs no training data and no instrumentation per station, and takes a few minutes to set up a new procedure.
+
 ## The problem
 
-Catching a skipped screw, a rushed solder joint or an out-of-order step normally means instrumenting every bench with smart torque drivers, RFID gates and PLC light curtains, at $10k–$25k per station. Garment and electronics lines in Bangladesh and other emerging markets can't justify that, so defects get caught at final test or in the field.
+Catching a skipped screw, a rushed solder joint or an out-of-order step normally means instrumenting every bench with smart torque drivers, RFID gates and PLC light curtains, at $10k–$25k per station. Garment and electronics lines in Bangladesh and other emerging markets can't justify that, so defects get caught at final test or in the field, where they cost far more.
 
-Pointing a vision-language model at raw video doesn't fix this either. VLMs sample sparse frames and guess at actions. They can't tell a 0.4 s iron contact (a cold joint) from the 2.0 s the spec requires, and they can't reliably count four screw-downs across 400 frames.
+Pointing a vision-language model at raw video doesn't fix this either. VLMs sample sparse frames and guess at actions. They can't tell a 0.4 s iron contact (a cold joint) from the 2.0 s the spec requires, and they can't reliably count four screw-downs across 400 frames. A QA system has to *measure*, and it has to be right about timing and counts every time.
+
+## How each Meta model gets us there
+
+**The goal:** verify every step of a manual procedure from one ordinary camera, with no sensors and no per-station training, and explain each failure so the line can fix it.
+
+No single model can do that. KineSight gives each Meta model the part of the job it is best at, and keeps counting and timing in deterministic code.
+
+### SAM 3.1: the measuring instrument
+
+**What it does here.** SAM 3.1 finds and follows each tool, part and hand named in the rules, through the whole video, from a text prompt such as `"screwdriver"`, `"metal plate"` or `"soldering iron"`. For every frame it returns a box and a pixel mask for each object, with an object ID that stays the same from frame to frame.
+
+**Why it's essential.**
+- **No training per station.** A new procedure only needs new nouns. Classic vision would need a labeled dataset and a trained detector for every tool on every line, which is exactly the cost that keeps small factories from automating QA.
+- **Pixel masks, not just boxes.** Masks are what make geometry possible: centroids, speeds and the dilated-mask contact test that tells *touching* from *near*.
+- **IDs that stay stable through occlusion.** The operator's hand covers the part exactly where the work happens. Stable tracks keep one screw-down from being counted as two.
+
+**How we call it.**
+1. The clip is resampled to 15 fps and uploaded once through the Files API.
+2. Each concept prompt is segmented with one streamed `POST /v1/responses` call.
+3. The mask stream is decoded with Meta's official `@meta-sam/parser`, in a small Node sidecar that writes bit-packed masks for NumPy.
+4. Raw output is cached per `(video, prompt)`, so editing rules never re-bills SAM.
+
+**Cost.** At $0.20 per 1,000 video frames, a 40-second cycle with three tracked objects costs about $0.36 to segment. That makes inspecting every unit economically realistic.
+
+### Muse Spark 1.3: the engineer and the auditor
+
+Muse Spark plays two roles. Both need language and judgment, which math can't supply.
+
+**1. SOP compiler: language in, checkable rules out.** An SOP is written for people: "drive all four corner screws until seated, keep the driver engaged for at least 1.5 seconds". Muse Spark turns it, using strict JSON-schema structured output, into:
+- the SAM prompts to track, named by appearance (for example "metal plate", not "mounting plate", because SAM finds what things *look* like);
+- one rule per verifiable step: actor, target, minimum seconds per contact, and number of contacts.
+
+PDF SOPs work too. Structured output means the response always parses into the rules the engine needs. Without this step, someone would have to hand-write rules for every procedure.
+
+**2. Root-cause auditor: judgment only where the math flags a problem.** When a rule fails, Muse Spark gets:
+- three keyframes from before, at and after the anomaly, with SAM contours drawn on;
+- the measured telemetry;
+- the failing rule.
+
+It decides whether this is a **genuine defect** or a **measurement artifact** such as occlusion or a mask dropout. It names *where* it happened (for example "the top-right corner hole") and *why*, and writes a corrective action for the line supervisor.
+
+It is told that the telemetry is ground truth for *when* and *how many*, so it never re-estimates durations from pixels. It is only called on anomalies, so a passing cycle costs no language-model calls at all.
+
+### Muse Image 1.0: closing the loop on the floor
+
+A root cause in a dashboard doesn't change what the operator does next cycle. For each confirmed defect, Muse Spark writes a diagram prompt and Muse Image draws a top-down work-instruction diagram of the corrected procedure. The diagram shows numbered positions, the required sequence and hold times. A picture works across the many languages spoken on a factory floor, and it can be printed and posted at the station.
+
+### The Meta Model API: one key, one integration
+
+All three models are reached through the OpenAI-compatible Meta Model API (`https://api.meta.ai/v1`) with a single key:
+- the Files API for video;
+- streaming Responses for SAM;
+- structured outputs for Muse Spark;
+- image generation for Muse Image.
+
+One client, one retry policy (exponential backoff with `tenacity`) and one place to budget spend.
+
+| Model | Pipeline stage | Input | Output | Why it matters |
+|---|---|---|---|---|
+| `sam-3.1` | Tracking | Video and text prompts | Per-frame masks with stable IDs | Turns a $30 camera into a measuring instrument with no training |
+| `muse-spark-1.3` | SOP compiler | SOP text or PDF | JSON rules and SAM prompts | Any written procedure becomes machine-checkable in seconds |
+| `muse-spark-1.3` | Auditor | 3 keyframes, telemetry, rule | Genuine or artifact, location, root cause, fix | Separates real defects from occlusion and explains them |
+| `muse-image-1.0` | Corrective diagram | Diagram prompt | Work-instruction image | Gives the operator a visual fix |
 
 ## How it works
 
@@ -31,22 +125,32 @@ flowchart LR
     H --> UI
 ```
 
-1. **SOP compiler (Muse Spark 1.3).** The SOP is compiled with strict JSON-schema decoding into the objects SAM should segment (short visual noun phrases) and one machine-checkable rule per step: which actor must touch which target, the minimum seconds per contact, and how many contacts. The rules are a proposal. In the UI an engineer can tune or remove any of them before analysis.
-2. **Tracking (SAM 3.1).** The video is resampled to 15 fps, uploaded once through the Files API, and segmented once per concept prompt over `POST /v1/responses`. SAM returns a box and mask for every object in every frame, with IDs that stay stable across frames. Mask streams are decoded with Meta's official `@meta-sam/parser`.
+1. **SOP compiler (Muse Spark 1.3).** The SOP becomes SAM prompts plus one contact rule per step. The rules are a proposal: an engineer can tune or remove any of them in the UI before analysis.
+2. **Tracking (SAM 3.1).**
+   - The video is resampled to 15 fps and 1280 px wide, then segmented once per prompt.
+   - `hand` is always tracked as context.
+   - Masks stay bit-packed in memory and are unpacked one frame at a time, so even a long clip of a frame-filling part fits in a few dozen MB.
 3. **Kinematic engine (`backend/services/kinematics.py`).** No model is involved in this stage. For every frame and object it computes:
    - **Centroid** from spatial moments: `(x, y) = (M10/M00, M01/M00)`.
-   - **Tool speed** in frame diagonals per second, rolling-median smoothed over 0.6 s. It separates transit from stationary work and doesn't depend on resolution.
-   - **Contact** as `sum(Dilate(Mask_tool, k) AND Solid(Mask_target))`. The target is taken as the union of per-instance convex hulls, because the operator's hand cuts a notch into the plate mask exactly where the work happens, and the hull restores it.
-   - **Intervals**: a frame counts as contact when the overlap clears the threshold and the tool is below the work-speed threshold. Gaps under 0.8 s (brief occlusions) are bridged and blips under 0.6 s are dropped, giving discrete `start_sec / end_sec / duration_sec` intervals, each with where on the frame the contact happened.
-4. **Rule evaluator (`rule_evaluator.py`).** It flags `FAIL_MISSING`, `FAIL_COUNT_SHORTFALL`, `FAIL_SHORT_DURATION` and `FAIL_ORDER`, and computes the compliance score as the mean step credit. A passed step earns 1. A count or duration shortfall earns the share of required contacts that qualified, so 3 of 4 screws earns 0.75. An out-of-order step earns 0.
-5. **Audit (Muse Spark 1.3 + Muse Image).** Only for flagged steps: three keyframes around the anomaly, with SAM contours drawn on, go to Muse Spark along with the telemetry and the SOP rule. It decides whether this is a genuine defect or an occlusion artifact, names where it happened, and writes the corrective action plus a prompt for Muse Image, which draws the work-instruction diagram.
+   - **Tool speed** in frame diagonals per second, rolling-median smoothed over 0.6 s. Speed separates transit from stationary work and doesn't depend on resolution.
+   - **Contact** as `sum(Dilate(Mask_tool, k) AND Solid(Mask_target))`. The target is taken as the union of per-instance convex hulls: the operator's hand cuts a notch into the plate mask exactly where the work happens, and the hull fills it back in.
+   - **Intervals.** A frame counts as contact when the overlap clears the threshold *and* the tool is below the work-speed threshold. Gaps under 0.8 s (brief occlusions) are bridged and blips under 0.6 s are dropped. The result is discrete `start_sec / end_sec / duration_sec` intervals, each with where on the frame the contact happened.
+4. **Rule evaluator (`rule_evaluator.py`).**
+   - Rules are matched in SOP order, so one contact is never credited to two steps.
+   - Each step gets `PASS`, `FAIL_MISSING`, `FAIL_COUNT_SHORTFALL`, `FAIL_SHORT_DURATION` or `FAIL_ORDER`.
+   - The compliance score is the mean step credit. A passed step earns 1. A count or duration shortfall earns the share of required contacts that qualified, so 3 of 4 screws earns 0.75. An out-of-order step earns 0.
+5. **Audit (Muse Spark 1.3 + Muse Image).** Only flagged steps are audited, as described above.
+   - The cycle is **FAIL** if any defect is confirmed (or the auditor is unreachable).
+   - It is **REVIEW** if every flag was judged an artifact.
+   - It is **PASS** if nothing was flagged.
 
 ### Engineering guarantees
 
-- **Math before language models.** Durations, counts and contacts come only from `kinematics.py`. The auditor is told the telemetry is ground truth for *when* and *how many*. It judges only *where* and *why*.
-- **Idempotent caching.** Results are keyed by `(video_sha256, sop_sha256, analysis settings)`, and raw SAM output is cached per `(video, prompt)`, so re-running a known clip returns in milliseconds and editing an SOP never re-bills SAM.
-- **Graceful degradation.** Every Meta API call retries with exponential backoff (`tenacity`). If the auditor is unreachable, the deterministic finding still stands and the UI says so.
-- **Resolution-independent overlay.** Mask polygons are normalized to `[0, 1]`, so the canvas overlay lines up at any player size.
+- **Math before language models.** Durations, counts and contacts come only from `kinematics.py`. The auditor judges only *where* and *why*.
+- **Idempotent caching.** Results are keyed by `(video sha256, SOP sha256, analysis settings)` and raw SAM output by `(video, prompt)`. Re-running a known clip returns in milliseconds, and editing an SOP never re-bills SAM.
+- **Graceful degradation.** Every Meta API call retries with exponential backoff. If the auditor is unreachable, the deterministic finding still stands and the UI says so.
+- **Bounded spend on public hosts.** Daily budgets cover new video analyses, rule re-runs and compiles. Clip length and size are capped. A server without a key replays recorded results and never calls the API.
+- **Resolution-independent overlay.** Mask polygons are normalized to `[0, 1]`, so the overlay lines up at any player size.
 
 ## Demo presets
 
@@ -56,9 +160,147 @@ flowchart LR
 | Mounting plate: compliant cycle | Pexels 856232, reversed | **PASS**, 4 of 4 |
 | Soldering bench: flux dip + joint dwell | Pexels 7314032 | **PASS**, flux 3.4 s, joint 14.9 s |
 
-All three SOPs in the repo were compiled live by Muse Spark 1.3. Their results ship pre-computed in `backend/presets/*/cache`, so the demo replays instantly without an API key.
+All three SOPs were compiled live by Muse Spark 1.3. Their results ship pre-computed in `backend/presets/*/cache`, so the presets replay instantly, even without an API key.
 
-## Running it
+## User manual
+
+### The workbench at a glance
+
+| Area | What it holds |
+|---|---|
+| **Left: rules** | Footage picker (presets and upload), the SOP editor, **Compile rules with Muse Spark 1.3**, the compiled rule cards, and **Analyze video** |
+| **Center: evidence** | The video with live SAM 3.1 mask overlays, and the kinematic telemetry timeline below it |
+| **Right: verdict** | QA verdict, compliance score, per-step results, defect cards with root cause, keyframes, the Muse Image diagram, and pipeline latency |
+
+The layout adapts to the screen:
+- **Wider than 1280 px:** three columns side by side.
+- **Tablets and small laptops:** the rules column stays pinned at the left while the results scroll.
+- **Phones:** one column, and **Analyze video** floats at the bottom of the screen. After an analysis, the page scrolls to the results.
+
+**Analyze video** is always within reach at every size.
+
+### Step 1: choose footage
+
+- **Presets.** Click one of the three cards. Its video, SOP and compiled rules load together.
+- **Your own clip.** Click **Upload your own bench video (mp4 / mov)** and pick a file.
+  - On the hosted demo, clips are limited to 20 s and 50 MB. The note under the button shows how many live analyses are left today.
+  - Running it yourself, the only limits are the ones you set (see [Configuration](#configuration)).
+
+### Step 2: give it the SOP
+
+Paste or type the procedure into **Standard operating procedure**, or click **PDF / TXT** to upload a document. An uploaded document is compiled straight away.
+
+### Step 3: compile the rules
+
+Click **Compile rules with Muse Spark 1.3**. A new SOP takes roughly 20–60 s. An SOP that was compiled before comes back instantly from the cache, and the note under the button says which happened. You get:
+- **SAM chips**: the objects SAM 3.1 will track, color-coded to match the video overlay.
+- **Rule cards**, one per verifiable step. Each card shows the description, `actor ∩ target`, the minimum seconds per contact (`≥ 1.5 s`) and the number of contacts (`× 4`).
+
+### Step 4: review and tune the rules
+
+The compiled rules are a proposal. Before analyzing you can:
+- change **≥ s**, the minimum duration of each contact;
+- change **×**, the number of contacts the step needs;
+- remove a rule with the **✕** that appears when you hover over the card.
+
+Edited rules reuse the cached SAM output. Only the kinematics, the rule check and, if something fails, the audit run again.
+
+On the hosted demo the presets' SAM output isn't stored, so re-running a preset with edited rules needs a fresh SAM pass. That is limited to clips up to 20 s, the same as uploads. The note under the compile button changes to "Rules edited by reviewer".
+
+### Step 5: analyze
+
+Click **Analyze video**. The line under the button shows progress:
+- Preparing video
+- Segmenting N objects with SAM 3.1, then "SAM 3.1 finished '…'" for each object
+- Computing centroids, velocities and contacts
+- Auditing flagged steps with Muse Spark
+- Done
+
+A combination of video and rules that was analyzed before is **Served from cache** instantly. On the hosted demo a new clip takes a few minutes, because the free server has a tenth of a CPU core.
+
+### Step 6: read the results
+
+**Video and overlays (center top)**
+- Each tracked object is drawn as a colored mask outline with its centroid and label. The colors match the SAM chips.
+- **Play / pause** and **restart** sit under the video, next to the time, the frame counter and the analysis frame rate.
+- Click an object's chip (for example `screwdriver`) to hide or show its overlay.
+
+**Kinematic telemetry (center bottom)**
+- The line chart is the tool's speed over time, in frame diagonals per second.
+  - The **dashed line** is the stationary-work threshold: contact only counts while the tool is below it.
+  - The **white line** marks the current video time.
+  - A **red line** marks a defect.
+- Under the chart, each step has a lane:
+  - **green bars** are contacts that met the minimum duration;
+  - **amber bars** are contacts that were too short;
+  - a **glowing red marker** sits where a defect was flagged.
+- The lane header reads like `3/4 contacts ≥ 1.5s`.
+- **Click anywhere** on the chart or a lane to jump the video there.
+
+**Verdict (right)**
+- **QA verdict and compliance:** PASS, FAIL or REVIEW, the score, the cycle time and the frames analyzed.
+- **SOP steps:** each step's status, plus a chip for every measured contact, such as `#2 11.5s · 5.6s` (start · duration). Click a chip to jump to it. Missing contacts show as dashed red `#4 missing` chips.
+- **Defect cards**, one per flagged step:
+  - **Severity**: CRITICAL for a skipped step or too few contacts, MAJOR for too short or out of order.
+  - **`t = …s ↗`** jumps to the moment of the defect.
+  - **The auditor's call**, with its confidence: "Muse Spark 1.3 confirmed a genuine defect", "judged this a measurement artifact", or "Auditor unavailable · deterministic finding only".
+  - **Root cause** and **Corrective action**.
+  - **Audited keyframes**: click to zoom.
+  - **Muse Image corrective diagram**: click to zoom.
+- **Pipeline latency:** time spent in each stage of the original run, and whether this view was served from cache.
+
+### Verdicts and statuses
+
+| Status | Meaning | Step credit |
+|---|---|---|
+| `PASS` | Enough qualifying contacts, in order | 1 |
+| `FAIL_MISSING` | No contact at all: the step was skipped | 0 |
+| `FAIL_COUNT_SHORTFALL` | Fewer contacts than the step requires | qualifying ÷ required |
+| `FAIL_SHORT_DURATION` | Enough contacts, but too few lasted the minimum time | qualifying ÷ required |
+| `FAIL_ORDER` | The step was otherwise complete, but its first contact came before the previous step's | 0 |
+
+The cycle is **PASS** when nothing is flagged, **FAIL** when a flagged step is confirmed (or can't be audited), and **REVIEW** when every flag was judged a measurement artifact, meaning a person should take a look.
+
+### Writing an SOP that compiles well
+
+- **One physical action per step**, with the tool and the part it touches: "Using the screwdriver, drive all four corner screws."
+- **State numbers when you have them:** "at least 1.5 seconds per screw", "four screws". Otherwise Muse Spark picks a realistic value, such as 1.5 s for a screw or 2.0 s for a solder joint.
+- **Describe tools by what they look like** ("Phillips screwdriver with an orange handle"). The compiler turns them into prompts SAM can find.
+- **Purely manual steps can't be checked from video and are skipped:** placing a screw by hand, a visual inspection, peeling a film. Hands rest on the work the whole time, so their contacts can't be counted.
+
+See `backend/presets/plate_4screw_sop.txt` and `solder_joint_sop.txt` for examples.
+
+### Filming a clip that analyzes well
+
+- **A fixed camera** above or at an angle to the bench. A moving camera breaks speed measurements.
+- **Keep the whole work area in frame for the whole cycle:** the part, the tools and where they rest.
+- **Even light without hard glare.** Shiny metal parts track better under diffuse light.
+- **One cycle per clip.** Trim idle time before and after; it's analyzed and billed too.
+- Any common format works (`mp4`, `mov`, `m4v`, `avi`, `mkv`, `webm`). Clips are converted to 15 fps and 1280 px wide automatically.
+
+### Shortcuts in the URL
+
+| Parameter | Effect |
+|---|---|
+| `?preset=plate_4screw_defect` | Opens a preset (`plate_4screw_pass`, `solder_joint_pass`) |
+| `&run=1` | Analyzes it on load |
+| `&t=24.2` | Jumps the video to 24.2 s once results arrive |
+
+### Troubleshooting
+
+| You see | What it means | What to do |
+|---|---|---|
+| "Backend unreachable" | The UI can't reach the API | Start the backend (`uvicorn main:app --port 8000`) |
+| "This server replays recorded analyses" | The server has no `META_API_KEY` | Presets still replay. Add a key to analyze new clips or edited rules |
+| "… budget for today is used up" | The public daily budget is spent | Try again tomorrow, or run it yourself |
+| "Video is 34s long; the public demo accepts up to 20s" | The clip is over the cap | Trim it to one cycle |
+| "These rules need a fresh SAM 3.1 pass over this preset's 41s clip" | Edited rules on a long preset, on a capped server | Analyze the preset's original rules, upload a short clip, or run it yourself |
+| A rule finds no contacts at all | SAM didn't find one of the objects | Rename it to what it looks like ("metal plate", not "bracket") and recompile |
+| The first page load takes a minute | The free server was asleep | Wait. The next loads are instant |
+
+## Running it yourself
+
+### Locally
 
 Requirements: Python 3.11+, Node 20+, ffmpeg on `PATH`, and a Meta Model API key.
 
@@ -80,14 +322,12 @@ npm install
 npm run dev                       # http://localhost:3000
 ```
 
-Open `http://localhost:3000`, pick a preset and press **Analyze video**. `?preset=plate_4screw_defect&run=1` runs a preset on load. To try your own footage, upload a bench video, paste or upload the SOP, compile it, check the rules, and analyze.
+Open `http://localhost:3000`, pick a preset and press **Analyze video**.
 
 ```bash
 cd backend && python -m pytest -q          # 24 unit tests: kinematics, rules, schemas
 python scripts/build_presets.py            # rebuild presets from Pexels and re-run the pipeline
 ```
-
-Thresholds live in `backend/config.py` and can be overridden from `.env` (`STATIONARY_SPEED`, `DILATE_FRAC`, `MAX_GAP_SEC`, …).
 
 ### Docker (single container)
 
@@ -96,41 +336,93 @@ docker build -t kinesight .
 docker run -p 7860:7860 -e META_API_KEY=your-key kinesight    # http://localhost:7860
 ```
 
-The image serves the static frontend and the API on one port. Guards for a public deployment are on by default: daily budgets for new video analyses, preset re-runs with edited rules, and SOP compiles, plus 60 s / 200 MB upload caps (`DAILY_VIDEO_JOBS`, `DAILY_RULE_JOBS`, `DAILY_COMPILES`, `MAX_VIDEO_SEC`, `MAX_UPLOAD_MB`; `0` = unlimited). `LIVE_ANALYSIS=0` turns the server into a replay of the cached preset analyses that never calls the Meta API; `render.yaml` deploys that mode on Render's free plan. `python scripts/deploy_space.py` publishes the committed tree to a Hugging Face Docker Space and stores the key as a Space secret.
+The image serves the static frontend and the API on one port, with the public-deployment guards on by default (see below).
+
+### Deploying on Render's free plan
+
+The repo includes a `render.yaml` Blueprint.
+1. In Render, choose **New → Blueprint** and pick this repository. It creates a free Docker web service.
+2. In the service's **Environment** tab, set `META_API_KEY`. Uploads and live analysis switch on after the automatic redeploy.
+3. Without a key, the site replays the recorded presets and never calls the API.
+
+The free plan has 512 MB of RAM and 0.1 CPU. The Blueprint therefore:
+- limits clips to 20 s and 50 MB;
+- runs one job at a time;
+- decodes masks one prompt at a time;
+- encodes video on one thread;
+- limits Python's memory arenas.
+
+Tested in a container with the same limits, a 15 s upload peaks below the memory cap and takes about 10 minutes end to end.
+
+### Configuration
+
+Every value can be set in `.env` or as an environment variable.
+
+| Variable | Default (local / Docker) | Purpose |
+|---|---|---|
+| `META_API_KEY` | none | Meta Model API key. Without it the server is replay-only |
+| `LIVE_ANALYSIS` | `1` | `0` forces replay-only mode even with a key |
+| `DAILY_VIDEO_JOBS` | `0` / `10` | New video analyses per day (`0` = unlimited) |
+| `DAILY_RULE_JOBS` | `0` / `40` | Re-runs with edited rules per day |
+| `DAILY_COMPILES` | `0` / `40` | SOP compiles not already cached, per day |
+| `MAX_VIDEO_SEC` | `0` / `60` | Longest accepted clip, in seconds |
+| `MAX_UPLOAD_MB` | `0` / `200` | Largest accepted upload |
+| `MAX_CONCURRENT_JOBS` | `2` | Analyses running at once |
+| `SAM_DECODE_WORKERS` | `4` | Mask decoders running at once (use `1` on 512 MB hosts) |
+| `FFMPEG_THREADS` | `0` (ffmpeg decides) | Video encoding threads; each one buffers frames (use `1` on 512 MB hosts) |
+| `FPS_RATE`, `ANALYSIS_WIDTH` | `15`, `1280` | Analysis frame rate and width |
+| `STATIONARY_SPEED` | `0.45` | Work-speed threshold, in frame diagonals per second |
+| `DILATE_FRAC`, `OVERLAP_FRAC` | `0.03`, `0.0002` | Contact dilation kernel and minimum overlap, relative to the frame |
+| `MAX_GAP_SEC`, `MIN_INTERVAL_SEC` | `0.8`, `0.6` | Occlusion gaps bridged, and shortest contact kept |
+| `SAM_MODEL`, `SPARK_MODEL`, `IMAGE_MODEL` | `sam-3.1`, `muse-spark-1.3`, `muse-image-1.0` | Model IDs |
+
+## API reference
+
+| Method and path | Purpose |
+|---|---|
+| `GET /api/health` | Status, whether a key is set, and the remaining daily budgets |
+| `GET /api/presets` | Preset clips with their SOP text and compiled rules |
+| `POST /api/sop/compile` | `{"text": "..."}` → `{"sop": CompiledSop, "cached": bool}` |
+| `POST /api/sop/compile-file` | Multipart `file` (PDF/TXT) → `{"text", "sop", "cached"}` |
+| `POST /api/jobs` | Multipart `sop` (CompiledSop JSON) plus `preset_id` or `video` → `{"job_id"}` |
+| `GET /api/jobs/{job_id}` | `{"status", "stage", "error", "result": JobResult}` |
+| `GET /presets/…`, `/cache/…` | Videos, per-frame tracks, keyframes and diagrams |
+
+The contracts (`CompiledSop`, `Telemetry`, `AuditVerdict`, `JobResult`) are Pydantic models in `backend/schemas.py`.
 
 ## Repository layout
 
 ```
 backend/
-  main.py                 FastAPI: presets, SOP compile, analysis jobs, static media
-  config.py               model IDs and kinematic thresholds
-  schemas.py              Pydantic contracts: CompiledSop, Telemetry, AuditVerdict
+  main.py                 FastAPI: presets, SOP compile, analysis jobs, budgets, static media
+  config.py               model IDs, kinematic thresholds, deployment guards
+  schemas.py              Pydantic contracts: CompiledSop, Telemetry, AuditVerdict, JobResult
   database.py             SQLite job records and daily usage budgets
   services/
+    meta_client.py        Meta Model API client: structured outputs, images, retries
     sop_compiler.py       Muse Spark 1.3: SOP text/PDF -> rules
-    sam_tracker.py        SAM 3.1 upload, streaming segmentation, mask decoding
+    sam_tracker.py        SAM 3.1 upload, streaming segmentation, lazy mask decoding
     kinematics.py         centroids, speed, dilated-mask contact, intervals
-    rule_evaluator.py     deterministic step verdicts and anomalies
+    rule_evaluator.py     deterministic step verdicts, anomalies and partial-credit score
     auditor.py            keyframes, Muse Spark audit, Muse Image diagram
     pipeline.py           orchestration and result cache
   sam_decoder/decode.mjs  @meta-sam/parser -> bit-packed masks for NumPy
   presets/                demo clips, SOPs and cached results
   scripts/                preset builder, Hugging Face Space deploy
-  tests/
+  tests/                  kinematics, rule engine and schema tests
 frontend/src/
-  app/page.tsx            three-panel workbench
+  app/page.tsx            responsive workbench
   components/             SopEditorPanel, AnnotatedVideoCanvas, TelemetryTimeline, AuditVerdictPanel
 Dockerfile                single-container build (static frontend served by FastAPI)
-render.yaml               Render Blueprint for the hosted replay demo
+render.yaml               Render Blueprint for the hosted demo
 ```
 
-## Meta models used
+## Limitations and next steps
 
-| Model | Role |
-|---|---|
-| `sam-3.1` | Text-prompted video segmentation and tracking of tools, parts and hands |
-| `muse-spark-1.3` | SOP → rules compiler (JSON schema), multimodal keyframe auditor |
-| `muse-image-1.0` | Corrective work-instruction diagrams for confirmed defects |
+- **Contact rules only.** KineSight verifies *that* and *how long* a tool touched a part, and in what order. It can't measure torque or confirm that a screw is fully seated. Pairing it with one cheap sensor per station would close that gap.
+- **One camera.** Work hidden from the camera can't be measured. The auditor flags those cases as artifacts instead of defects.
+- **Latency.** Muse Spark calls take 20–60 s, which is fine for a post-cycle audit but not for an in-cycle alert. Streaming SAM over a live camera feed is the next step.
+- **Video leaves the building.** Many factories can't send line video to a cloud API. An on-prem or VPC deployment of SAM 3.1 would remove that blocker.
 
 ## Credits
 

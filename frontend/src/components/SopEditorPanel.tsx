@@ -55,7 +55,7 @@ export default function SopEditorPanel(p: Props) {
             ))}
             {p.limits?.live === false ? (
               <div className="rounded-md border border-dashed border-line-2 px-2.5 py-2 text-[11px] leading-snug text-ink-3">
-                This hosted demo replays recorded analyses. To analyze your own footage or edited rules,{" "}
+                This server replays recorded analyses. To analyze your own footage or edited rules,{" "}
                 <a className="text-ink-2 underline" href="https://github.com/irrepressible007/kinesight" target="_blank" rel="noreferrer">
                   run KineSight locally
                 </a>
@@ -82,7 +82,8 @@ export default function SopEditorPanel(p: Props) {
             {p.limits?.live && p.limits.video_left != null && (
               <div className="num px-0.5 text-[10.5px] leading-snug text-ink-3">
                 Public demo: clips up to {p.limits.max_video_sec ?? "∞"}s · {p.limits.video_left} live video
-                analyses and {p.limits.compile_left} new compiles left today
+                analyses and {p.limits.compile_left} new compiles left today. A new clip takes a few minutes on
+                this free server.
               </div>
             )}
           </div>
