@@ -1,0 +1,103 @@
+{
+ "job_id": "preset-plate_4screw_pass",
+ "video_url": "/presets/plate_4screw_pass/video.mp4",
+ "tracks_url": "/presets/plate_4screw_pass/cache/tracks_f283686d4050_987128bc.json",
+ "sop": {
+  "sop_title": "Electronics Enclosure: Mounting Plate Fastening",
+  "sam_prompts": [
+   "screwdriver",
+   "metal plate"
+  ],
+  "steps": [
+   {
+    "step_number": 1,
+    "description": "Drive all four corner screws of the left mounting plate until seated",
+    "actor_object": "screwdriver",
+    "target_object": "metal plate",
+    "min_contact_sec": 1.5,
+    "required_contacts": 4
+   }
+  ]
+ },
+ "telemetry": {
+  "video_id": "plate_4screw_pass",
+  "fps_analyzed": 15.0,
+  "total_frames": 608,
+  "total_duration_sec": 40.53,
+  "frame_width": 1280,
+  "frame_height": 720,
+  "detected_interactions": [
+   {
+    "event_id": "evt_1",
+    "step_number": 1,
+    "description": "Drive all four corner screws of the left mounting plate until seated",
+    "actor": "screwdriver",
+    "target": "metal plate",
+    "min_contact_sec": 1.5,
+    "contact_intervals": [
+     {
+      "start_sec": 6.73,
+      "end_sec": 10.27,
+      "duration_sec": 3.53,
+      "mean_overlap_px": 5268.1,
+      "location": [
+       0.0778,
+       0.8597
+      ],
+      "meets_min_duration": true
+     },
+     {
+      "start_sec": 11.47,
+      "end_sec": 17.07,
+      "duration_sec": 5.6,
+      "mean_overlap_px": 7269.9,
+      "location": [
+       0.0897,
+       0.1759
+      ],
+      "meets_min_duration": true
+     },
+     {
+      "start_sec": 22.8,
+      "end_sec": 26.07,
+      "duration_sec": 3.27,
+      "mean_overlap_px": 29728.8,
+      "location": [
+       0.443,
+       0.8691
+      ],
+      "meets_min_duration": true
+     },
+     {
+      "start_sec": 30.07,
+      "end_sec": 35.53,
+      "duration_sec": 5.47,
+      "mean_overlap_px": 31522.1,
+      "location": [
+       0.4367,
+       0.1403
+      ],
+      "meets_min_duration": true
+     }
+    ],
+    "contacts_detected": 4,
+    "contacts_required": 4,
+    "status": "PASS"
+   }
+  ]
+ },
+ "verdict": {
+  "overall_status": "PASS",
+  "cycle_time_sec": 40.53,
+  "compliance_score": 100.0,
+  "defects": []
+ },
+ "timings_ms": {
+  "prepare": 39.7,
+  "sam_tracking": 164.7,
+  "kinematics": 30131.5,
+  "rules": 0.1,
+  "audit": 0.1
+ },
+ "cached": false
+}

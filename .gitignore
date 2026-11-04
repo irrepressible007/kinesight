@@ -35,3 +35,10 @@ desktop.ini
 
 # Office lock files
 ~$*
+
+# Pipeline intermediates (regenerable; presets ship only final results + media)
+backend/presets/raw/
+backend/presets/*/cache/analysis.mp4
+backend/presets/*/cache/sam_*.txt
+backend/presets/*/cache/*.dec.json
+backend/presets/*/cache/*.dec.bin

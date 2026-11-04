@@ -1,0 +1,20 @@
+{
+  "title": "Mounting plate: operator skips a screw",
+  "subtitle": "Reversed and trimmed so the cycle ends with the top-right screw never driven.",
+  "sop_text_file": "../plate_4screw_sop.txt",
+  "sop": {
+    "sop_title": "Electronics Enclosure: Mounting Plate Fastening",
+    "sam_prompts": ["screwdriver", "metal plate"],
+    "steps": [
+      {
+        "step_number": 1,
+        "description": "Drive all four corner screws of the left mounting plate until seated",
+        "actor_object": "screwdriver",
+        "target_object": "metal plate",
+        "min_contact_sec": 1.5,
+        "required_contacts": 4
+      }
+    ]
+  },
+  "source": {"credit": "Pexels video 856232 (Pexels License), edited", "url": "https://www.pexels.com/video/unscrewing-screws-856232/"}
+}

@@ -1,0 +1,11 @@
+SOP-ME-214  Electronics Enclosure: Mounting Plate Fastening (Station 4)
+
+Purpose: Secure the left component mounting plate to the enclosure base before the PCB is installed.
+Loose plates cause board flex and vibration failures in field returns.
+
+Tools: Phillips #1 screwdriver (orange handle). Parts: 4x M3 x 6 pan-head screws.
+
+1. Place one M3 screw into each of the four corner holes of the left mounting plate.
+2. Using the screwdriver, drive all four corner screws until seated. Keep the driver engaged on each
+   screw for at least 1.5 seconds so the screw reaches seating torque.
+3. Visually confirm no corner hole is left empty before passing the enclosure to Station 5.
