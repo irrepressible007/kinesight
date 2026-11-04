@@ -45,9 +45,10 @@ def solid_region(instances: list[Instance], height: int, width: int) -> np.ndarr
     region. Hulls are per instance so separate objects are never bridged together."""
     out = np.zeros((height, width), np.uint8)
     for inst in instances:
-        pts = cv2.findNonZero(inst.mask)
-        if pts is not None:
-            hull = cv2.convexHull(pts + np.array([inst.left, inst.top], dtype=pts.dtype))
+        # The hull of the outer contours equals the hull of all pixels, at a fraction of the cost.
+        contours, _ = cv2.findContours(inst.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        if contours:
+            hull = cv2.convexHull(np.vstack(contours) + np.array([inst.left, inst.top], dtype=np.int32))
             cv2.fillConvexPoly(out, hull, 1)
     return out
 
