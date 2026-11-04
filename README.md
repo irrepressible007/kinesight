@@ -182,7 +182,7 @@ The layout adapts to the screen:
 ### Step 1: choose footage
 
 - **Presets.** Click one of the three cards. Its video, SOP and compiled rules load together.
-- **Your own clip.** Click **Upload your own bench video (mp4 / mov)** and pick a file.
+- **Your own clip.** Click **Analyze your own video** (highlighted, with a LIVE badge) and pick a file.
   - On the hosted demo, clips are limited to 20 s and 50 MB. The note under the button shows how many live analyses are left today.
   - Running it yourself, the only limits are the ones you set (see [Configuration](#configuration)).
 

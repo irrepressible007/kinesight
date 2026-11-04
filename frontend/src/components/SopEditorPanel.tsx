@@ -1,6 +1,6 @@
 "use client";
 
-import { FileUp, Film, Loader2, Play, Sparkles, X } from "lucide-react";
+import { FileUp, Loader2, Play, Sparkles, Upload, X } from "lucide-react";
 import { useRef } from "react";
 import { colorFor } from "@/lib/api";
 import type { CompiledSop, Limits, Preset, SopStep } from "@/lib/types";
@@ -64,12 +64,22 @@ export default function SopEditorPanel(p: Props) {
             ) : (
               <button
                 onClick={() => videoFile.current?.click()}
-                className={`flex w-full items-center gap-2 rounded-md border border-dashed px-2.5 py-2 text-left text-[12px] transition ${
-                  p.upload ? "border-accent text-ink" : "border-line-2 text-ink-2 hover:border-ink-3"
+                className={`w-full rounded-md border px-2.5 py-2 text-left shadow-[0_0_18px_-8px_rgba(255,200,80,0.6)] transition hover:border-accent hover:bg-accent/15 ${
+                  p.upload ? "border-accent bg-accent/15" : "border-accent/70 bg-accent/10"
                 }`}
               >
-                <Film size={14} />
-                {p.upload ? p.upload.name : "Upload your own bench video (mp4 / mov)"}
+                <div className="flex min-w-0 items-center gap-2 text-[13px] font-semibold text-accent">
+                  <Upload size={14} strokeWidth={2.5} className="shrink-0" />
+                  <span className="truncate">{p.upload ? p.upload.name : "Analyze your own video"}</span>
+                  <span className="num ml-auto shrink-0 rounded bg-accent px-1.5 py-px text-[9.5px] font-bold tracking-wider text-black">
+                    LIVE
+                  </span>
+                </div>
+                <div className="mt-0.5 text-[11px] leading-snug text-ink-2">
+                  {p.upload
+                    ? "Loaded. Check the rules below, then press Analyze video."
+                    : "Upload a bench clip (mp4 / mov). SAM 3.1 tracks it live and the engine measures every contact."}
+                </div>
               </button>
             )}
             <input
