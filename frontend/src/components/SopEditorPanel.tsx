@@ -1,9 +1,9 @@
 "use client";
 
-import { FileUp, Film, Loader2, Play, Sparkles } from "lucide-react";
+import { FileUp, Film, Loader2, Play, Sparkles, X } from "lucide-react";
 import { useRef } from "react";
 import { colorFor } from "@/lib/api";
-import type { CompiledSop, Preset } from "@/lib/types";
+import type { CompiledSop, Preset, SopStep } from "@/lib/types";
 
 interface Props {
   presets: Preset[];
@@ -12,6 +12,7 @@ interface Props {
   sopText: string;
   onSopText: (t: string) => void;
   sop: CompiledSop | null;
+  onSopChange: (sop: CompiledSop) => void;
   compiling: boolean;
   compileNote: string | null;
   onCompile: () => void;
@@ -28,6 +29,10 @@ export default function SopEditorPanel(p: Props) {
   const sopFile = useRef<HTMLInputElement>(null);
   const videoFile = useRef<HTMLInputElement>(null);
   const labels = p.trackLabels.length ? p.trackLabels : [...(p.sop?.sam_prompts ?? []), "hand"];
+
+  // Compiled rules are a proposal; the engineer can tune or drop them before analysis.
+  const editStep = (n: number, patch: Partial<SopStep>) =>
+    p.sop && p.onSopChange({ ...p.sop, steps: p.sop.steps.map((s) => (s.step_number === n ? { ...s, ...patch } : s)) });
 
   return (
     <div className="flex h-full flex-col gap-3 overflow-y-auto pr-1">
@@ -65,7 +70,7 @@ export default function SopEditorPanel(p: Props) {
         </div>
       </div>
 
-      <div className="flex min-h-0 flex-col">
+      <div className="flex shrink-0 flex-col">
         <div className="mb-1.5 flex items-center justify-between">
           <span className="label">Standard operating procedure</span>
           <button onClick={() => sopFile.current?.click()} className="flex items-center gap-1 text-[11px] text-ink-2 hover:text-ink">
@@ -83,7 +88,7 @@ export default function SopEditorPanel(p: Props) {
           value={p.sopText}
           onChange={(e) => p.onSopText(e.target.value)}
           spellCheck={false}
-          className="h-44 resize-none rounded-md border border-line bg-panel-2 p-2.5 text-[12px] leading-relaxed text-ink-2 outline-none focus:border-line-2"
+          className="h-44 shrink-0 resize-none rounded-md border border-line bg-panel-2 p-2.5 text-[12px] leading-relaxed text-ink-2 outline-none focus:border-line-2"
         />
         <button
           onClick={p.onCompile}
@@ -112,17 +117,49 @@ export default function SopEditorPanel(p: Props) {
           </div>
           <div className="space-y-1.5">
             {p.sop.steps.map((s) => (
-              <div key={s.step_number} className="rounded-md border border-line bg-panel-2 px-2.5 py-2">
-                <div className="text-[12.5px] leading-snug text-ink">
-                  <span className="num mr-1 text-ink-3">{s.step_number}.</span>
-                  {s.description}
+              <div key={s.step_number} className="group rounded-md border border-line bg-panel-2 px-2.5 py-2">
+                <div className="flex items-start gap-1 text-[12.5px] leading-snug text-ink">
+                  <span className="flex-1">
+                    <span className="num mr-1 text-ink-3">{s.step_number}.</span>
+                    {s.description}
+                  </span>
+                  {p.sop!.steps.length > 1 && (
+                    <button
+                      onClick={() => p.onSopChange({ ...p.sop!, steps: p.sop!.steps.filter((x) => x.step_number !== s.step_number) })}
+                      className="text-ink-3 opacity-0 transition group-hover:opacity-100 hover:text-fail"
+                      title="Remove this rule"
+                      aria-label="Remove this rule"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
                 </div>
                 <div className="num mt-1.5 flex flex-wrap items-center gap-1 text-[10.5px]">
                   <span style={{ color: colorFor(labels, s.actor_object) }}>{s.actor_object}</span>
                   <span className="text-ink-3">∩</span>
                   <span style={{ color: colorFor(labels, s.target_object) }}>{s.target_object}</span>
-                  <span className="ml-auto rounded bg-bg px-1.5 py-px text-ink-2">≥ {s.min_contact_sec}s</span>
-                  <span className="rounded bg-bg px-1.5 py-px text-ink-2">× {s.required_contacts}</span>
+                  <label className="ml-auto flex items-center rounded bg-bg px-1.5 py-px text-ink-2">
+                    ≥
+                    <input
+                      type="number"
+                      step={0.1}
+                      min={0}
+                      value={s.min_contact_sec}
+                      onChange={(e) => editStep(s.step_number, { min_contact_sec: Math.max(0, Number(e.target.value)) })}
+                      className="num w-9 bg-transparent text-right outline-none"
+                    />
+                    s
+                  </label>
+                  <label className="flex items-center rounded bg-bg px-1.5 py-px text-ink-2">
+                    ×
+                    <input
+                      type="number"
+                      min={1}
+                      value={s.required_contacts}
+                      onChange={(e) => editStep(s.step_number, { required_contacts: Math.max(1, Math.round(Number(e.target.value))) })}
+                      className="num w-6 bg-transparent text-right outline-none"
+                    />
+                  </label>
                 </div>
               </div>
             ))}

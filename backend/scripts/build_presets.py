@@ -27,6 +27,8 @@ PRESETS = {
     "plate_4screw_pass": (856232, "scale=1280:-2,reverse", None),
     # Same cycle cut at 27s, before the last (top-right) screw is driven.
     "plate_4screw_defect": (856232, "scale=1280:-2,reverse", 27.0),
+    # Pexels 7314032: flux dip, then a long dwell on the joint in the helping-hands clamp.
+    "solder_joint_pass": (7314032, "scale=1280:-2", None),
 }
 
 

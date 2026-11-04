@@ -1,9 +1,9 @@
 {
  "job_id": "preset-plate_4screw_pass",
  "video_url": "/presets/plate_4screw_pass/video.mp4",
- "tracks_url": "/presets/plate_4screw_pass/cache/tracks_f283686d4050_987128bc.json",
+ "tracks_url": "/presets/plate_4screw_pass/cache/tracks_7dcf4233ebe8_987128bc.json",
  "sop": {
-  "sop_title": "Electronics Enclosure: Mounting Plate Fastening",
+  "sop_title": "Electronics Enclosure Mounting Plate Fastening",
   "sam_prompts": [
    "screwdriver",
    "metal plate"
@@ -11,7 +11,7 @@
   "steps": [
    {
     "step_number": 1,
-    "description": "Drive all four corner screws of the left mounting plate until seated",
+    "description": "Drive all four corner screws of the metal plate until seated with screwdriver",
     "actor_object": "screwdriver",
     "target_object": "metal plate",
     "min_contact_sec": 1.5,
@@ -30,7 +30,7 @@
    {
     "event_id": "evt_1",
     "step_number": 1,
-    "description": "Drive all four corner screws of the left mounting plate until seated",
+    "description": "Drive all four corner screws of the metal plate until seated with screwdriver",
     "actor": "screwdriver",
     "target": "metal plate",
     "min_contact_sec": 1.5,
@@ -93,11 +93,11 @@
   "defects": []
  },
  "timings_ms": {
-  "prepare": 39.7,
-  "sam_tracking": 164.7,
-  "kinematics": 30131.5,
+  "prepare": 41.5,
+  "sam_tracking": 170.4,
+  "kinematics": 29926.1,
   "rules": 0.1,
-  "audit": 0.1
+  "audit": 0.0
  },
  "cached": false
 }

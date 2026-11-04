@@ -1,0 +1,11 @@
+WI-EL-031  LED Driver Harness: Lead Termination Soldering (Bench 2)
+
+Purpose: Terminate the red supply lead onto the driver terminal held in the helping-hands
+metal clamp. Cold joints from rushed heating are the top cause of intermittent field failures.
+
+Equipment: temperature-controlled soldering iron (350 C), flux tin, helping-hands metal clamp.
+
+1. Clean and wet the soldering iron tip by dipping it into the flux tin for at least 1 second.
+2. Hold the iron tip on the joint in the metal clamp for at least 2.0 seconds so the joint reaches
+   wetting temperature before feeding solder. Do not lift early.
+3. Let the joint cool undisturbed and inspect for a shiny concave fillet.

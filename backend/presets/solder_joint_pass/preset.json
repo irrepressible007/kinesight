@@ -1,0 +1,35 @@
+{
+  "title": "Soldering bench: flux dip + joint dwell",
+  "subtitle": "Angled bench camera, different station and objects. Both steps are measured.",
+  "sop_text_file": "../solder_joint_sop.txt",
+  "sop": {
+    "sop_title": "LED Driver Harness Lead Termination Soldering",
+    "sam_prompts": [
+      "soldering iron",
+      "flux tin",
+      "metal clamp"
+    ],
+    "steps": [
+      {
+        "step_number": 1,
+        "description": "Dip soldering iron tip into flux tin to clean and wet tip",
+        "actor_object": "soldering iron",
+        "target_object": "flux tin",
+        "min_contact_sec": 1.0,
+        "required_contacts": 1
+      },
+      {
+        "step_number": 2,
+        "description": "Hold soldering iron tip on joint in metal clamp to reach wetting temperature",
+        "actor_object": "soldering iron",
+        "target_object": "metal clamp",
+        "min_contact_sec": 2.0,
+        "required_contacts": 1
+      }
+    ]
+  },
+  "source": {
+    "credit": "Pexels video 7314032 (Pexels License), resized",
+    "url": "https://www.pexels.com/video/a-person-using-soldering-iron-7314032/"
+  }
+}

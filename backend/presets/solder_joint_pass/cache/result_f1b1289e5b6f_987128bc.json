@@ -1,0 +1,103 @@
+{
+ "job_id": "preset-solder_joint_pass",
+ "video_url": "/presets/solder_joint_pass/video.mp4",
+ "tracks_url": "/presets/solder_joint_pass/cache/tracks_f1b1289e5b6f_987128bc.json",
+ "sop": {
+  "sop_title": "LED Driver Harness Lead Termination Soldering",
+  "sam_prompts": [
+   "soldering iron",
+   "flux tin",
+   "metal clamp"
+  ],
+  "steps": [
+   {
+    "step_number": 1,
+    "description": "Dip soldering iron tip into flux tin to clean and wet tip",
+    "actor_object": "soldering iron",
+    "target_object": "flux tin",
+    "min_contact_sec": 1.0,
+    "required_contacts": 1
+   },
+   {
+    "step_number": 2,
+    "description": "Hold soldering iron tip on joint in metal clamp to reach wetting temperature",
+    "actor_object": "soldering iron",
+    "target_object": "metal clamp",
+    "min_contact_sec": 2.0,
+    "required_contacts": 1
+   }
+  ]
+ },
+ "telemetry": {
+  "video_id": "solder_joint_pass",
+  "fps_analyzed": 15.0,
+  "total_frames": 307,
+  "total_duration_sec": 20.47,
+  "frame_width": 1280,
+  "frame_height": 676,
+  "detected_interactions": [
+   {
+    "event_id": "evt_1",
+    "step_number": 1,
+    "description": "Dip soldering iron tip into flux tin to clean and wet tip",
+    "actor": "soldering iron",
+    "target": "flux tin",
+    "min_contact_sec": 1.0,
+    "contact_intervals": [
+     {
+      "start_sec": 0.13,
+      "end_sec": 3.53,
+      "duration_sec": 3.4,
+      "mean_overlap_px": 4039.2,
+      "location": [
+       0.2868,
+       0.7079
+      ],
+      "meets_min_duration": true
+     }
+    ],
+    "contacts_detected": 1,
+    "contacts_required": 1,
+    "status": "PASS"
+   },
+   {
+    "event_id": "evt_2",
+    "step_number": 2,
+    "description": "Hold soldering iron tip on joint in metal clamp to reach wetting temperature",
+    "actor": "soldering iron",
+    "target": "metal clamp",
+    "min_contact_sec": 2.0,
+    "contact_intervals": [
+     {
+      "start_sec": 5.53,
+      "end_sec": 20.47,
+      "duration_sec": 14.93,
+      "mean_overlap_px": 1855.4,
+      "location": [
+       0.5507,
+       0.3831
+      ],
+      "meets_min_duration": true
+     }
+    ],
+    "contacts_detected": 1,
+    "contacts_required": 1,
+    "status": "PASS"
+   }
+  ]
+ },
+ "verdict": {
+  "overall_status": "PASS",
+  "cycle_time_sec": 20.47,
+  "compliance_score": 100.0,
+  "defects": []
+ },
+ "timings_ms": {
+  "prepare": 42.8,
+  "sam_tracking": 37.3,
+  "kinematics": 9469.8,
+  "rules": 0.1,
+  "audit": 0.0
+ },
+ "cached": false
+}

@@ -39,13 +39,16 @@ def centroid(mask: np.ndarray) -> tuple[float, float] | None:
     return m["m10"] / m["m00"], m["m01"] / m["m00"]
 
 
-def solid_region(mask: np.ndarray) -> np.ndarray:
-    """Convex hull of a mask. Hands occluding a rigid part (plate, board) cut notches and
-    holes into its mask exactly where the work happens; the hull restores that region."""
-    pts = cv2.findNonZero(mask)
-    out = np.zeros_like(mask)
-    if pts is not None:
-        cv2.fillConvexPoly(out, cv2.convexHull(pts), 1)
+def solid_region(instances: list[Instance], height: int, width: int) -> np.ndarray:
+    """Union of per-instance convex hulls. Hands occluding a rigid part (plate, board) cut
+    notches and holes into its mask exactly where the work happens; the hull restores that
+    region. Hulls are per instance so separate objects are never bridged together."""
+    out = np.zeros((height, width), np.uint8)
+    for inst in instances:
+        pts = cv2.findNonZero(inst.mask)
+        if pts is not None:
+            hull = cv2.convexHull(pts + np.array([inst.left, inst.top], dtype=pts.dtype))
+            cv2.fillConvexPoly(out, hull, 1)
     return out
 
 
@@ -162,7 +165,7 @@ def analyze(tracks: dict[str, PromptTrack], width: int, height: int, fps: float,
             if masks.get(a) is None or masks.get(b) is None:
                 continue
             if b not in solids:
-                solids[b] = solid_region(masks[b])
+                solids[b] = solid_region(tracks[b].get(t, []), height, width)
             n, loc = dilated_overlap(masks[a], solids[b], kernel_px)
             overlap[(a, b)][t] = n
             if loc is not None:

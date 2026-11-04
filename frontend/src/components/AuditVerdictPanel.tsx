@@ -173,7 +173,7 @@ export default function AuditVerdictPanel({ result, onSeek }: Props) {
             </div>
           ))}
           <div className="col-span-2 mt-0.5 flex justify-between border-t border-line pt-0.5">
-            <span className="text-ink-3">first run total</span>
+            <span className="text-ink-3">original run total</span>
             <span>{(totalMs / 1000).toFixed(1)}s</span>
           </div>
         </div>

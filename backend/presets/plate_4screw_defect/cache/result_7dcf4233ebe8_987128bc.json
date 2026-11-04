@@ -1,9 +1,9 @@
 {
  "job_id": "preset-plate_4screw_defect",
  "video_url": "/presets/plate_4screw_defect/video.mp4",
- "tracks_url": "/presets/plate_4screw_defect/cache/tracks_f283686d4050_987128bc.json",
+ "tracks_url": "/presets/plate_4screw_defect/cache/tracks_7dcf4233ebe8_987128bc.json",
  "sop": {
-  "sop_title": "Electronics Enclosure: Mounting Plate Fastening",
+  "sop_title": "Electronics Enclosure Mounting Plate Fastening",
   "sam_prompts": [
    "screwdriver",
    "metal plate"
@@ -11,7 +11,7 @@
   "steps": [
    {
     "step_number": 1,
-    "description": "Drive all four corner screws of the left mounting plate until seated",
+    "description": "Drive all four corner screws of the metal plate until seated with screwdriver",
     "actor_object": "screwdriver",
     "target_object": "metal plate",
     "min_contact_sec": 1.5,
@@ -30,7 +30,7 @@
    {
     "event_id": "evt_1",
     "step_number": 1,
-    "description": "Drive all four corner screws of the left mounting plate until seated",
+    "description": "Drive all four corner screws of the metal plate until seated with screwdriver",
     "actor": "screwdriver",
     "target": "metal plate",
     "min_contact_sec": 1.5,
@@ -90,20 +90,20 @@
      "/presets/plate_4screw_defect/cache/keyframes/step1_1.jpg",
      "/presets/plate_4screw_defect/cache/keyframes/step1_2.jpg"
     ],
-    "root_cause_summary": "The left plate's top-right corner hole at center-top remains visibly empty in the final clear view at 26.95s while the other three corners show seated screws. The three measured contacts match the three seated corners, so the shortfall is a true missed screw, not an occlusion artifact.",
-    "corrective_action": "Drive the missing fourth screw at the empty top-right hole of the left plate until seated, meeting the 1.5 sec minimum contact. Verify top-down that all four left-plate corners show seated screw heads with no empty holes.",
+    "root_cause_summary": "Operator performed three qualifying contacts on the left and bottom-center area and never dwelled on the top-right corner. The after frame shows the tool withdrawn with work ended, confirming the fourth corner was skipped.",
+    "corrective_action": "Reposition plate fully in frame and drive each of the four corner screws until seated with at least 1.5 seconds of screwdriver contact per corner. Verify all four corners are seated before ending the cycle.",
     "corrective_diagram_url": "/presets/plate_4screw_defect/cache/diagrams/step1.webp",
     "auditor_confirmed": true,
-    "auditor_confidence": 0.94
+    "auditor_confidence": 0.9
    }
   ]
  },
  "timings_ms": {
-  "prepare": 45.5,
-  "sam_tracking": 113.2,
-  "kinematics": 22867.0,
+  "prepare": 41.7,
+  "sam_tracking": 110.4,
+  "kinematics": 22962.7,
   "rules": 0.1,
-  "audit": 44771.9
+  "audit": 60813.8
  },
  "cached": false
 }

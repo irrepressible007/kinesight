@@ -20,6 +20,9 @@ Rules:
 - Each step is one physical contact rule: actor_object touches target_object. Both MUST be exact
   strings from sam_prompts, and must differ. Prefer a large, stable target (the plate or board being
   worked on) over tiny parts that the tool will hide (screws, pins).
+- Never use "hand" as actor_object or target_object: hands rest on the work for the whole cycle, so
+  their contacts cannot be counted. Write the rule for the tool or part the hand is holding instead.
+  Steps done purely by hand with no tool (placing a screw, peeling a film) cannot be verified; skip them.
 - min_contact_sec: the minimum seconds each contact must last. Use the SOP's number when given;
   otherwise a realistic value for the action (screw driving ~1.5, soldering a joint ~2.0).
 - required_contacts: how many separate contacts the step needs (e.g. 4 screws -> 4).

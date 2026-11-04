@@ -8,6 +8,7 @@ from services.kinematics import (
     place_mask,
     polygons,
     smooth,
+    solid_region,
     velocities,
 )
 from services.sam_tracker import Instance
@@ -85,3 +86,13 @@ def test_polygons_are_normalized():
     xs, ys = polys[0][0::2], polys[0][1::2]
     assert min(xs) == pytest.approx(0.1) and max(xs) == pytest.approx(119 / 200)
     assert min(ys) == pytest.approx(0.1) and max(ys) == pytest.approx(0.49)
+
+
+def test_solid_region_fills_occlusion_notch_per_instance():
+    plate = np.ones((10, 10), np.uint8)
+    plate[4:7, 0:5] = 0  # a hand-shaped notch cut into the plate's left edge
+    far = np.ones((2, 2), np.uint8)
+    solid = solid_region([Instance("0", 0, 0, plate), Instance("1", 30, 30, far)], 40, 40)
+    assert solid[5, 2] == 1  # notch restored
+    assert solid[20, 20] == 0  # the two instances are not bridged
+    assert solid[30:32, 30:32].all()

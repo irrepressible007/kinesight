@@ -40,7 +40,7 @@ export default function Workbench() {
     setError(null);
   }, []);
 
-  const [autoRun, setAutoRun] = useState(false);
+  const autoRun = useRef(false);
 
   // ?preset=<id> selects a preset, &run=1 analyzes it on load (handy for demo recordings).
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function Workbench() {
         setPresets(ps);
         const wanted = ps.find((p) => p.id === params.get("preset")) ?? ps[0];
         if (wanted) selectPreset(wanted);
-        setAutoRun(params.get("run") === "1");
+        autoRun.current = params.get("run") === "1";
       })
       .catch(() => setError("Backend unreachable. Start it with: uvicorn main:app --port 8000"));
   }, [selectPreset]);
@@ -128,13 +128,13 @@ export default function Workbench() {
   };
 
   useEffect(() => {
-    if (autoRun && sop && presetId) {
-      setAutoRun(false);
+    if (autoRun.current && sop && presetId) {
+      autoRun.current = false;
       onAnalyze();
     }
     // onAnalyze reads the latest state; only the trigger matters here
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoRun, sop, presetId]);
+  }, [sop, presetId]);
 
   const seek = useCallback((t: number) => {
     const v = videoRef.current;
@@ -186,6 +186,10 @@ export default function Workbench() {
             sopText={sopText}
             onSopText={setSopText}
             sop={sop}
+            onSopChange={(s) => {
+              setSop(s);
+              setCompileNote("Rules edited by reviewer.");
+            }}
             compiling={compiling}
             compileNote={compileNote}
             onCompile={onCompile}
