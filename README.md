@@ -5,9 +5,11 @@
 Built for the Meta Global AI Developer Hackathon (Push the Frontier: Manufacturing, Hardware Assembly & Physical Systems).
 
 **Live demo: [kinesight.onrender.com](https://kinesight.onrender.com/?preset=plate_4screw_defect&run=1)**
-- It replays the three recorded preset analyses instantly.
+- It replays the three recorded preset analyses instantly, including the downloadable QA report and the side-by-side cycle comparison.
 - It also accepts your own clips: up to 60 s each, within a small daily budget. On the free server a new clip takes about half its length in minutes (about 30 minutes for a full minute), so keep the tab open while it runs.
 - The first visit after a quiet spell can take about a minute while the server wakes up.
+
+**Demo video:** *(YouTube link)*
 
 ![Workbench](docs/workbench.png)
 
@@ -36,6 +38,9 @@ It answers four questions:
 2. **Does that meet the SOP?** Each step gets PASS or a specific failure: skipped, too few contacts, too short, or out of order. The cycle gets a compliance score.
 3. **If not, is it a real defect, and why did it happen?** The answer is a root cause and a corrective action in plain words, checked against the actual keyframes.
 4. **What should the operator do differently?** The answer is a generated work-instruction diagram.
+5. **How does this cycle compare with a good one?** It is shown side by side with a compliant reference cycle, on one time axis.
+
+Every analysis can be downloaded as a self-contained QA report (HTML, printable to PDF) for the line supervisor.
 
 The outcome is zero-sensor quality assurance for manual assembly. It works with any camera, needs no training data and no instrumentation per station, and takes a few minutes to set up a new procedure.
 
@@ -129,7 +134,7 @@ flowchart LR
 2. **Tracking (SAM 3.1).**
    - The video is resampled to 15 fps and 1280 px wide, then segmented once per prompt.
    - `hand` is always tracked as context.
-   - Masks stay bit-packed in memory and are unpacked one frame at a time, so even a long clip of a frame-filling part fits in a few dozen MB.
+   - SAM's output streams straight to disk. The decoded masks stay bit-packed in a memory-mapped file and are unpacked one frame at a time. Together these keep a minute-long clip of a frame-filling part to about 250 MB in total.
 3. **Kinematic engine (`backend/services/kinematics.py`).** No model is involved in this stage. For every frame and object it computes:
    - **Centroid** from spatial moments: `(x, y) = (M10/M00, M01/M00)`.
    - **Tool speed** in frame diagonals per second, rolling-median smoothed over 0.6 s. Speed separates transit from stationary work and doesn't depend on resolution.
@@ -150,6 +155,7 @@ flowchart LR
 - **Idempotent caching.** Results are keyed by `(video sha256, SOP sha256, analysis settings)` and raw SAM output by `(video, prompt)`. Re-running a known clip returns in milliseconds, and editing an SOP never re-bills SAM.
 - **Graceful degradation.** Every Meta API call retries with exponential backoff. If the auditor is unreachable, the deterministic finding still stands and the UI says so.
 - **Bounded spend on public hosts.** Daily budgets cover new video analyses, rule re-runs and compiles. Clip length and size are capped. A server without a key replays recorded results and never calls the API.
+- **Bounded memory.** Memory stays flat as clips get longer. A 59 s upload was tested in a container with Render's free-plan limits (512 MB, no swap): it peaked at about 250 MB and never hit the limit.
 - **Resolution-independent overlay.** Mask polygons are normalized to `[0, 1]`, so the overlay lines up at any player size.
 
 ## Demo presets
@@ -203,9 +209,9 @@ The compiled rules are a proposal. Before analyzing you can:
 - change **×**, the number of contacts the step needs;
 - remove a rule with the **✕** that appears when you hover over the card.
 
-Edited rules reuse the cached SAM output. Only the kinematics, the rule check and, if something fails, the audit run again.
+Edited rules reuse the cached SAM output. Only the kinematics, the rule check and, if something fails, the audit run again. The note under the compile button changes to "Rules edited by reviewer".
 
-On the hosted demo the presets' SAM output isn't stored, so re-running a preset with edited rules needs a fresh SAM pass and takes about as long as uploading the clip. The note under the compile button changes to "Rules edited by reviewer".
+On the hosted demo the presets' SAM output isn't stored, so re-running a preset with edited rules needs a fresh SAM pass and takes about as long as uploading the clip.
 
 ### Step 5: analyze
 
@@ -371,7 +377,7 @@ The free plan has 512 MB of RAM and 0.1 CPU. The Blueprint therefore:
 - encodes video on one thread;
 - limits Python's memory arenas.
 
-Masks are memory-mapped and decoded one frame at a time, and SAM's output streams to disk, so memory stays flat as clips get longer.
+Masks are memory-mapped and decoded one frame at a time, and SAM's output streams to disk, so memory stays flat as clips get longer (see [Engineering guarantees](#engineering-guarantees)).
 
 ### Configuration
 
@@ -433,6 +439,7 @@ frontend/src/
   app/page.tsx            responsive workbench
   components/             SopEditorPanel, AnnotatedVideoCanvas, TelemetryTimeline, AuditVerdictPanel, CompareCycles
   lib/report.ts           self-contained HTML QA report with embedded keyframes and diagram
+  lib/api.ts              API client and job polling
 Dockerfile                single-container build (static frontend served by FastAPI)
 render.yaml               Render Blueprint for the hosted demo
 ```
