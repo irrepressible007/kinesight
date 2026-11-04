@@ -1,9 +1,7 @@
-# Secrets and local-only files
+# Secrets and VCS metadata
 .env
 .env.*
 .git
-*.docx
-SUBMISSION_DRAFT.md
 
 # Dependencies and build output (rebuilt in the image)
 **/node_modules
