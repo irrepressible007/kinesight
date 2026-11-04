@@ -23,6 +23,9 @@ IMAGE_MODEL = os.getenv("IMAGE_MODEL", "muse-image-1.0")
 # Video is resampled to this rate and width before segmentation.
 FPS_RATE = _float("FPS_RATE", 15)
 ANALYSIS_WIDTH = int(os.getenv("ANALYSIS_WIDTH", 1280))
+# Uploads can be analyzed narrower than presets to save CPU on small hosts. Thresholds are
+# relative to the frame, and preset results (keyed by ANALYSIS_WIDTH) stay valid.
+UPLOAD_WIDTH = int(os.getenv("UPLOAD_WIDTH", 0)) or ANALYSIS_WIDTH
 
 # Kinematic thresholds are relative to the frame so they hold at any resolution.
 DILATE_FRAC = _float("DILATE_FRAC", 0.030)  # dilation kernel, fraction of frame width

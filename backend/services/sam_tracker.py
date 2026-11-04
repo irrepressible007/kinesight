@@ -88,14 +88,14 @@ def probe(path: Path) -> tuple[int, int, float, int]:
     return int(s["width"]), int(s["height"]), float(num) / float(den), int(s["nb_read_packets"])
 
 
-def make_analysis_video(src: Path, dst: Path, fps: float = config.FPS_RATE) -> Path:
+def make_analysis_video(src: Path, dst: Path, fps: float = config.FPS_RATE, width: int = config.ANALYSIS_WIDTH) -> Path:
     """Resample to the analysis frame rate and width as H.264, which SAM accepts."""
     if dst.exists():
         return dst
     dst.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-i", str(src),
-         "-vf", f"fps={fps},scale='min({config.ANALYSIS_WIDTH},iw)':-2",
+         "-vf", f"fps={fps},scale='min({width},iw)':-2",
          "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-threads", config.FFMPEG_THREADS,
          "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dst)],
         check=True,

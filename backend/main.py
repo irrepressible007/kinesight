@@ -150,7 +150,7 @@ def _run_job(job_id: str, source: Path, video: Path, sop: CompiledSop, work_dir:
             database.update_job(job_id, status="running", stage="Preparing video")
             # Encoded here rather than in the request: on a slow host it takes minutes.
             if not video.exists():
-                pipeline.make_playback_video(source, video)
+                pipeline.make_upload_video(source, video)
             result = pipeline.run(job_id, video, sop, work_dir, url_prefix, video_url,
                                   progress=lambda stage: database.update_job(job_id, stage=stage))
         _results[job_id] = result
@@ -190,8 +190,8 @@ def create_job(sop: str = Form(...), preset_id: str | None = Form(None), video: 
             tmp_path.unlink()
         else:
             tmp_path.replace(source)
-        video_path = work_dir / "video.mp4"
-        url_prefix, video_url = f"/cache/{video_sha[:16]}", f"/cache/{video_sha[:16]}/video.mp4"
+        video_path = work_dir / "analysis.mp4"
+        url_prefix, video_url = f"/cache/{video_sha[:16]}", f"/cache/{video_sha[:16]}/analysis.mp4"
     else:
         raise HTTPException(400, "Provide a preset_id or a video file")
 
@@ -206,7 +206,7 @@ def create_job(sop: str = Form(...), preset_id: str | None = Form(None), video: 
     if not hit:
         spend("rules" if preset_id else "video")
     elif not video_path.exists():
-        pipeline.make_playback_video(source, video_path)
+        pipeline.make_upload_video(source, video_path)
 
     job_id = uuid.uuid4().hex[:12]
     database.create_job(job_id, video_sha, pipeline.sop_sha(compiled))

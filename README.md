@@ -6,7 +6,7 @@ Built for the Meta Global AI Developer Hackathon (Push the Frontier: Manufacturi
 
 **Live demo: [kinesight.onrender.com](https://kinesight.onrender.com/?preset=plate_4screw_defect&run=1)**
 - It replays the three recorded preset analyses instantly, including the downloadable QA report and the side-by-side cycle comparison.
-- It also accepts your own clips: up to 60 s each, within a small daily budget. On the free server a new clip takes about half its length in minutes (about 30 minutes for a full minute), so keep the tab open while it runs.
+- It also accepts your own clips: up to 60 s each, within a small daily budget. On the free server a 10 s clip takes about 3 minutes and a full minute about 15, so keep the tab open while it runs.
 - The first visit after a quiet spell can take about a minute while the server wakes up.
 
 **Demo video:** *(YouTube link)*
@@ -222,7 +222,7 @@ Click **Analyze video**. The line under the button shows progress:
 - Auditing flagged steps with Muse Spark
 - Done
 
-A combination of video and rules that was analyzed before is **Served from cache** instantly. On the hosted demo a new clip takes about half its length in minutes, because the free server has a tenth of a CPU core. Keep the tab open while it runs: the free server sleeps after 15 minutes without visitors.
+A combination of video and rules that was analyzed before is **Served from cache** instantly. On the hosted demo a 10 s clip takes about 3 minutes and a 60 s clip about 15, because the free server has a tenth of a CPU core. Keep the tab open while it runs: the free server sleeps after 15 minutes without visitors.
 
 ### Step 6: read the results
 
@@ -375,7 +375,8 @@ The free plan has 512 MB of RAM and 0.1 CPU. The Blueprint therefore:
 - runs one job at a time;
 - decodes masks one prompt at a time;
 - encodes video on one thread;
-- limits Python's memory arenas.
+- limits Python's memory arenas;
+- analyzes uploads at 640 px wide (`UPLOAD_WIDTH`) and encodes them once. The preset results stay at 1280 px. On the skipped-screw clip, 640 px finds the same three contacts and the same 75% FAIL, and the measurement step runs 20× faster.
 
 Masks are memory-mapped and decoded one frame at a time, and SAM's output streams to disk, so memory stays flat as clips get longer (see [Engineering guarantees](#engineering-guarantees)).
 
@@ -396,6 +397,7 @@ Every value can be set in `.env` or as an environment variable.
 | `SAM_DECODE_WORKERS` | `4` | Mask decoders running at once (use `1` on 512 MB hosts) |
 | `FFMPEG_THREADS` | `0` (ffmpeg decides) | Video encoding threads; each one buffers frames (use `1` on 512 MB hosts) |
 | `FPS_RATE`, `ANALYSIS_WIDTH` | `15`, `1280` | Analysis frame rate and width |
+| `UPLOAD_WIDTH` | `1280` / `640` | Analysis width for uploaded clips; the presets keep `ANALYSIS_WIDTH` |
 | `STATIONARY_SPEED` | `0.45` | Work-speed threshold, in frame diagonals per second |
 | `DILATE_FRAC`, `OVERLAP_FRAC` | `0.03`, `0.0002` | Contact dilation kernel and minimum overlap, relative to the frame |
 | `MAX_GAP_SEC`, `MIN_INTERVAL_SEC` | `0.8`, `0.6` | Occlusion gaps bridged, and shortest contact kept |

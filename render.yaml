@@ -24,3 +24,5 @@ services:
         value: "1"
       - key: MALLOC_ARENA_MAX
         value: "2"
+      - key: UPLOAD_WIDTH
+        value: "640"

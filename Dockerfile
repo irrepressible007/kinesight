@@ -32,7 +32,7 @@ COPY --chown=user --from=web /src/frontend/out frontend/out
 
 # Guards for a public deployment that spends the owner's API credit (0 = unlimited).
 ENV DAILY_VIDEO_JOBS=10 DAILY_RULE_JOBS=40 DAILY_COMPILES=40 \
-    MAX_VIDEO_SEC=60 MAX_UPLOAD_MB=200 MAX_CONCURRENT_JOBS=2
+    MAX_VIDEO_SEC=60 MAX_UPLOAD_MB=200 MAX_CONCURRENT_JOBS=2 UPLOAD_WIDTH=640
 
 WORKDIR /home/user/app/backend
 EXPOSE 7860

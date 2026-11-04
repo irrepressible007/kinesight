@@ -6,7 +6,6 @@ inputs returns the stored result without touching the network.
 
 import hashlib
 import json
-import subprocess
 import time
 from pathlib import Path
 from typing import Callable
@@ -45,17 +44,10 @@ def result_key(sop: CompiledSop) -> str:
     return f"{sop_sha(sop)[:12]}_{settings_fingerprint()}"
 
 
-def make_playback_video(src: Path, dst: Path) -> Path:
-    """Browser-safe H.264 copy; the analysis video is derived from it so both share a timeline."""
-    if not dst.exists():
-        subprocess.run(
-            ["ffmpeg", "-v", "error", "-y", "-i", str(src),
-             "-vf", f"scale='min({config.ANALYSIS_WIDTH},iw)':-2", "-an", "-c:v", "libx264",
-             "-preset", "veryfast", "-crf", "23", "-threads", config.FFMPEG_THREADS,
-             "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dst)],
-            check=True,
-        )
-    return dst
+def make_upload_video(src: Path, dst: Path) -> Path:
+    """One browser-safe H.264 encode at the analysis frame rate. It is both what the UI plays
+    and what SAM segments, so an upload is encoded once and both share a timeline."""
+    return sam_tracker.make_analysis_video(src, dst, width=config.UPLOAD_WIDTH)
 
 
 def cached_result(work_dir: Path, sop: CompiledSop) -> JobResult | None:
