@@ -33,7 +33,9 @@ MAX_GAP_SEC = _float("MAX_GAP_SEC", 0.8)  # contact gaps shorter than this are m
 MIN_INTERVAL_SEC = _float("MIN_INTERVAL_SEC", 0.6)  # shorter contacts are discarded as noise
 
 # Guards for a public deployment that spends the owner's API credit. 0 means unlimited,
-# the default for local runs.
+# the default for local runs. LIVE_ANALYSIS=0 turns the server into a replay of cached
+# results that never calls the Meta API (for small free hosts).
+LIVE_ANALYSIS = os.getenv("LIVE_ANALYSIS", "1").strip() != "0"
 DAILY_VIDEO_JOBS = int(os.getenv("DAILY_VIDEO_JOBS", 0))  # analyses of newly uploaded videos
 DAILY_RULE_JOBS = int(os.getenv("DAILY_RULE_JOBS", 0))  # preset re-runs with edited rules
 DAILY_COMPILES = int(os.getenv("DAILY_COMPILES", 0))  # SOP compiles not already cached

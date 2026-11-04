@@ -1,0 +1,11 @@
+# Render Blueprint: the free plan (512 MB) hosts a replay of the cached preset analyses.
+# Live analysis needs more memory and a META_API_KEY; run locally or on a larger host for that.
+services:
+  - type: web
+    name: kinesight
+    runtime: docker
+    plan: free
+    healthCheckPath: /api/health
+    envVars:
+      - key: LIVE_ANALYSIS
+        value: "0"

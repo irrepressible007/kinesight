@@ -94,7 +94,7 @@ docker build -t kinesight .
 docker run -p 7860:7860 -e META_API_KEY=your-key kinesight    # http://localhost:7860
 ```
 
-The image serves the static frontend and the API on one port. Guards for a public deployment are on by default: daily budgets for new video analyses, preset re-runs with edited rules, and SOP compiles, plus 60 s / 200 MB upload caps (`DAILY_VIDEO_JOBS`, `DAILY_RULE_JOBS`, `DAILY_COMPILES`, `MAX_VIDEO_SEC`, `MAX_UPLOAD_MB`; `0` = unlimited). `python scripts/deploy_space.py` publishes the committed tree to a Hugging Face Docker Space and stores the key as a Space secret.
+The image serves the static frontend and the API on one port. Guards for a public deployment are on by default: daily budgets for new video analyses, preset re-runs with edited rules, and SOP compiles, plus 60 s / 200 MB upload caps (`DAILY_VIDEO_JOBS`, `DAILY_RULE_JOBS`, `DAILY_COMPILES`, `MAX_VIDEO_SEC`, `MAX_UPLOAD_MB`; `0` = unlimited). `LIVE_ANALYSIS=0` turns the server into a replay of the cached preset analyses that never calls the Meta API; `render.yaml` deploys that mode on Render's free plan. `python scripts/deploy_space.py` publishes the committed tree to a Hugging Face Docker Space and stores the key as a Space secret.
 
 ## Repository layout
 
@@ -119,6 +119,7 @@ frontend/src/
   app/page.tsx            three-panel workbench
   components/             SopEditorPanel, AnnotatedVideoCanvas, TelemetryTimeline, AuditVerdictPanel
 Dockerfile                single-container build (static frontend served by FastAPI)
+render.yaml               Render Blueprint for the hosted replay demo
 ```
 
 ## Meta models used

@@ -1,7 +1,7 @@
 # Single container: the static Next.js export is served by the FastAPI backend on one port.
 #   docker build -t kinesight .
 #   docker run -p 7860:7860 -e META_API_KEY=... kinesight
-# Hugging Face Spaces (Docker SDK) builds and runs this file as-is.
+# Hosts that assign a port through $PORT (Render, Hugging Face Spaces) run this file as-is.
 
 FROM node:22-bookworm-slim AS web
 WORKDIR /src/frontend
@@ -36,4 +36,4 @@ ENV DAILY_VIDEO_JOBS=10 DAILY_RULE_JOBS=40 DAILY_COMPILES=40 \
 
 WORKDIR /home/user/app/backend
 EXPOSE 7860
-CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]
+CMD ["sh", "-c", "exec python -m uvicorn main:app --host 0.0.0.0 --port ${PORT:-7860}"]

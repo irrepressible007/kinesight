@@ -42,7 +42,13 @@ BUDGET_SPENT = {
 }
 
 
+REPLAY_ONLY = ("This hosted demo replays recorded results and makes no live model calls. "
+               "Clone the repo to compile new SOPs, edit rules or analyze your own video.")
+
+
 def spend(kind: str) -> None:
+    if not config.LIVE_ANALYSIS:
+        raise HTTPException(403, REPLAY_ONLY)
     if not database.take_quota(kind, BUDGETS[kind]):
         raise HTTPException(429, f"{BUDGET_SPENT[kind]} The presets still replay; run KineSight locally for unlimited use.")
 
@@ -54,6 +60,7 @@ def health():
         "meta_api_key": bool(config.META_API_KEY),
         "settings": pipeline.settings_fingerprint(),
         "limits": {
+            "live": config.LIVE_ANALYSIS,
             "max_video_sec": config.MAX_VIDEO_SEC or None,
             "max_upload_mb": config.MAX_UPLOAD_MB or None,
             **{f"{k}_left": database.quota_left(k, n) for k, n in BUDGETS.items()},
@@ -78,6 +85,15 @@ def load_presets() -> list[dict]:
 @app.get("/api/presets")
 def presets():
     return load_presets()
+
+
+def _seed_sop_cache() -> None:
+    """Each preset's rules were compiled live from its SOP text; register them in the compile
+    cache so recompiling a preset's text is instant even on a fresh deployment."""
+    for p in load_presets():
+        path = SOP_CACHE / f"{hashlib.sha256(p['sop_text'].strip().encode()).hexdigest()[:16]}.json"
+        if not path.exists():
+            path.write_text(CompiledSop.model_validate(p["sop"]).model_dump_json(indent=1), encoding="utf-8")
 
 
 # ---- stage 1: SOP compiler ---------------------------------------------------
@@ -156,6 +172,8 @@ def create_job(sop: str = Form(...), preset_id: str | None = Form(None), video: 
         video_path, video_url = source, f"/presets/{preset_id}/video.mp4"
         video_sha = preset_id
     elif video is not None:
+        if not config.LIVE_ANALYSIS:
+            raise HTTPException(403, REPLAY_ONLY)
         suffix = Path(video.filename or "").suffix.lower()
         if suffix not in VIDEO_TYPES:
             raise HTTPException(415, f"Unsupported video type '{suffix}'")
@@ -234,6 +252,8 @@ def get_job(job_id: str):
         "result": result.model_dump() if result else None,
     }
 
+
+_seed_sop_cache()
 
 # Registered last so the API routes and media mounts above take precedence.
 if config.FRONTEND_DIR.is_dir():

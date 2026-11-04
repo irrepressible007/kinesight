@@ -119,6 +119,7 @@ export interface Preset {
 }
 
 export interface Limits {
+  live: boolean;
   max_video_sec: number | null;
   max_upload_mb: number | null;
   video_left: number | null;
