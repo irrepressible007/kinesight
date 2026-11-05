@@ -9,7 +9,7 @@ Built for the Meta Global AI Developer Hackathon (Push the Frontier: Manufacturi
 - It also accepts your own clips: up to 60 s each, within a small daily budget. On the free server a 10 s clip takes about 3 minutes and a full minute about 15, so keep the tab open while it runs.
 - The first visit after a quiet spell can take about a minute while the server wakes up.
 
-**Demo video:** *(YouTube link)*
+**Demo video:** https://youtu.be/hC6k1zX42_Y
 
 ![Workbench](docs/workbench.png)
 
