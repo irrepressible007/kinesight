@@ -93,13 +93,16 @@ def make_analysis_video(src: Path, dst: Path, fps: float = config.FPS_RATE, widt
     if dst.exists():
         return dst
     dst.parent.mkdir(parents=True, exist_ok=True)
+    # Encode beside the target and rename on success, so an interrupted encode is never reused.
+    part = dst.with_name(f"{dst.stem}.part{dst.suffix}")
     subprocess.run(
         ["ffmpeg", "-v", "error", "-y", "-i", str(src),
          "-vf", f"fps={fps},scale='min({width},iw)':-2",
          "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-threads", config.FFMPEG_THREADS,
-         "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(dst)],
+         "-pix_fmt", "yuv420p", "-movflags", "+faststart", str(part)],
         check=True,
     )
+    part.replace(dst)
     return dst
 
 
